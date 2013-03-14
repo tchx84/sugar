@@ -52,3 +52,7 @@ class SectionView(Gtk.VBox):
     def undo(self):
         """Undo here the changes that have been made in this section."""
         pass
+
+    def apply(self):
+        """Apply here the changes that have been made in this section."""
+        pass

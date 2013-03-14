@@ -13,11 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+from gettext import gettext as _
 
 from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GObject
-from gettext import gettext as _
+from gi.repository import Gio
+from gi.repository import Pango
 
 from sugar3.graphics import style
 
@@ -32,6 +34,134 @@ TITLE = _('Network')
 _APPLY_TIMEOUT = 3000
 
 
+class SettingBox(Gtk.HBox):
+    """
+    Base class for "lines" on the screen representing configuration
+    settings.
+    """
+    def __init__(self, name, size_group=None):
+        Gtk.HBox.__init__(self, spacing=style.DEFAULT_SPACING)
+        label = Gtk.Label(name)
+        label.modify_fg(Gtk.StateType.NORMAL,
+                        style.COLOR_SELECTION_GREY.get_gdk_color())
+        label.set_alignment(1, 0.5)
+        if size_group is not None:
+            size_group.add_widget(label)
+        self.pack_start(label, False, False, 0)
+        label.show()
+
+
+class ComboSettingBox(Gtk.VBox):
+    """
+    Container for sets of different settings selected by a top-level
+    setting.
+
+    Renders the top level setting as a ComboBox.  Only the currently
+    active set is shown on screen.
+    """
+    def __init__(self, name, setting, setting_key,
+                 option_sets, size_group=None):
+        Gtk.VBox.__init__(self, spacing=style.DEFAULT_SPACING)
+
+        setting_box = SettingBox(name, size_group)
+        self.pack_start(setting_box, False, False, 0)
+        setting_box.show()
+
+        model = Gtk.ListStore(str, str, object)
+        combo_box = Gtk.ComboBox(model=model)
+        combo_box.connect('changed', self.__combo_changed_cb)
+        setting_box.pack_start(combo_box, True, True, 0)
+        combo_box.show()
+
+        cell_renderer = Gtk.CellRendererText()
+        cell_renderer.props.ellipsize = Pango.EllipsizeMode.MIDDLE
+        cell_renderer.props.ellipsize_set = True
+        combo_box.pack_start(cell_renderer, True)
+        combo_box.add_attribute(cell_renderer, 'text', 0)
+        combo_box.props.id_column = 1
+
+        self._settings_box = Gtk.VBox()
+        self._settings_box.show()
+        self.pack_start(self._settings_box, False, False, 0)
+
+        for optset in option_sets:
+            model.append(optset)
+
+        setting.bind(setting_key, combo_box, 'active-id',
+                     Gio.SettingsBindFlags.DEFAULT)
+
+    def __combo_changed_cb(self, combobox):
+        giter = combobox.get_active_iter()
+        new_box = combobox.get_model().get(giter, 2)[0]
+        current_box = self._settings_box.get_children()
+        if current_box:
+            self._settings_box.remove(current_box[0])
+
+        self._settings_box.add(new_box)
+        new_box.show()
+
+
+class OptionalSettingsBox(Gtk.VBox):
+    """
+    Container for settings (de)activated by a top-level setting.
+
+    Renders the top level setting as a CheckButton. The settings are only
+    shown on screen if the top-level setting is enabled.
+    """
+    def __init__(self, name, setting, setting_key, contents_box):
+        Gtk.VBox.__init__(self, spacing=style.DEFAULT_SPACING)
+
+        check_button = Gtk.CheckButton()
+        check_button.props.label = name
+        check_button.connect('toggled', self.__button_toggled_cb, contents_box)
+        check_button.show()
+        self.pack_start(check_button, True, True, 0)
+        self.pack_start(contents_box, False, False, 0)
+
+        setting.bind(setting_key, check_button, 'active',
+                     Gio.SettingsBindFlags.DEFAULT)
+
+    def __button_toggled_cb(self, check_button, contents_box):
+        contents_box.set_visible(check_button.get_active())
+
+
+class HostPortSettingBox(SettingBox):
+    """
+    A configuration line for a combined host name and port setting.
+    """
+    def __init__(self, name, setting, size_group=None):
+        SettingBox.__init__(self, name, size_group)
+
+        host_entry = Gtk.Entry()
+        self.pack_start(host_entry, True, True, 0)
+        host_entry.show()
+
+        setting.bind('host', host_entry, 'text', Gio.SettingsBindFlags.DEFAULT)
+
+        # port number 0 means n/a
+        adjustment = Gtk.Adjustment(0, 0, 65535, 1, 10)
+        port_spinbutton = Gtk.SpinButton(adjustment=adjustment, climb_rate=0.1)
+        self.pack_start(port_spinbutton, False, False, 0)
+        port_spinbutton.show()
+
+        setting.bind('port', port_spinbutton, 'value',
+                     Gio.SettingsBindFlags.DEFAULT)
+
+
+class StringSettingBox(SettingBox):
+    """
+    A configuration line for a string setting.
+    """
+    def __init__(self, name, setting, setting_key, size_group=None):
+        SettingBox.__init__(self, name, size_group)
+
+        entry = Gtk.Entry()
+        self.pack_start(entry, True, True, 0)
+        entry.show()
+
+        setting.bind(setting_key, entry, 'text', Gio.SettingsBindFlags.DEFAULT)
+
+
 class Network(SectionView):
     def __init__(self, model, alerts):
         SectionView.__init__(self)
@@ -44,6 +174,7 @@ class Network(SectionView):
         self._jabber_change_handler = None
         self._radio_change_handler = None
         self._network_configuration_reset_handler = None
+        self._proxy_settings = {}
 
         self.set_border_width(style.DEFAULT_SPACING * 2)
         self.set_spacing(style.DEFAULT_SPACING)
@@ -176,7 +307,134 @@ class Network(SectionView):
         workspace.pack_start(box_mesh, False, True, 0)
         box_mesh.show()
 
+        separator_proxy = Gtk.HSeparator()
+        workspace.pack_start(separator_proxy, False, False, 0)
+        separator_proxy.show()
+
+        self._add_proxy_section(workspace)
+
         self.setup()
+
+    def _add_proxy_section(self, workspace):
+        label_proxy = Gtk.Label(_('Proxy'))
+        label_proxy.set_alignment(0, 0)
+        workspace.pack_start(label_proxy, False, True, 0)
+        label_proxy.show()
+
+        box_proxy = Gtk.VBox()
+        box_proxy.set_border_width(style.DEFAULT_SPACING * 2)
+        box_proxy.set_spacing(style.DEFAULT_SPACING)
+        workspace.pack_start(box_proxy, False, True, 0)
+        box_proxy.show()
+
+        # GSettings schemas for proxy:
+        schemas = ['org.gnome.system.proxy',
+                   'org.gnome.system.proxy.http',
+                   'org.gnome.system.proxy.https',
+                   'org.gnome.system.proxy.ftp',
+                   'org.gnome.system.proxy.socks']
+
+        for schema in schemas:
+            proxy_setting = Gio.Settings.new(schema)
+
+            # We are not going to apply the settings immediatly.
+            # We'll apply them if the user presses the "accept"
+            # button, or we'll revert them if the user presses the
+            # "cancel" button.
+            proxy_setting.delay()
+
+            self._proxy_settings[schema] = proxy_setting
+
+        size_group = Gtk.SizeGroup(Gtk.SizeGroupMode.HORIZONTAL)
+
+        automatic_proxy_box = Gtk.VBox(spacing=style.DEFAULT_SPACING)
+        manual_proxy_box = Gtk.VBox(spacing=style.DEFAULT_SPACING)
+
+        option_sets = [('None', 'none', Gtk.VBox()),
+                       ('Manual', 'manual', manual_proxy_box),
+                       ('Automatic', 'auto', automatic_proxy_box)]
+
+        box_mode = ComboSettingBox(
+            _('Method:'), self._proxy_settings['org.gnome.system.proxy'],
+            'mode', option_sets, size_group)
+
+        box_proxy.pack_start(box_mode, False, False, 0)
+        box_mode.show()
+
+        url_box = StringSettingBox(
+            _('Configuration URL:'),
+            self._proxy_settings['org.gnome.system.proxy'], 'autoconfig-url',
+            size_group)
+
+        automatic_proxy_box.pack_start(url_box, True, True, 0)
+        url_box.show()
+
+        wpad_help_text = _('Web Proxy Autodiscovery is used when a'
+                           ' Configuration URL is not provided. This is not'
+                           ' recommended for untrusted public networks.')
+        automatic_proxy_help = Gtk.Label(wpad_help_text)
+        automatic_proxy_help.set_alignment(0, 0)
+        automatic_proxy_help.set_line_wrap(True)
+        automatic_proxy_help.show()
+        automatic_proxy_box.pack_start(automatic_proxy_help, True, True, 0)
+
+        box_http = HostPortSettingBox(
+            _('HTTP Proxy:'),
+            self._proxy_settings['org.gnome.system.proxy.http'], size_group)
+
+        manual_proxy_box.pack_start(box_http, False, False, 0)
+        box_http.show()
+
+        auth_contents_box = Gtk.VBox(spacing=style.DEFAULT_SPACING)
+
+        auth_box = OptionalSettingsBox(
+            _('Use authentication'),
+            self._proxy_settings['org.gnome.system.proxy.http'],
+            'use-authentication', auth_contents_box)
+
+        manual_proxy_box.pack_start(auth_box, False, False, 0)
+        auth_box.show()
+
+        proxy_http_setting = Gio.Settings.new('org.gnome.system.proxy.http')
+        proxy_http_setting.delay()
+
+        box_username = StringSettingBox(
+            _('Username:'),
+            self._proxy_settings['org.gnome.system.proxy.http'],
+            'authentication-user', size_group)
+
+        auth_contents_box.pack_start(box_username, False, False, 0)
+        box_username.show()
+
+        box_password = StringSettingBox(
+            _('Password:'),
+            self._proxy_settings['org.gnome.system.proxy.http'],
+            'authentication-password', size_group)
+
+        auth_contents_box.pack_start(box_password, False, False, 0)
+        box_password.show()
+
+        box_https = HostPortSettingBox(
+            _('HTTPS Proxy:'),
+            self._proxy_settings['org.gnome.system.proxy.https'], size_group)
+
+        manual_proxy_box.pack_start(box_https, False, False, 0)
+        box_https.show()
+
+        box_ftp = HostPortSettingBox(
+            _('FTP Proxy:'),
+            self._proxy_settings['org.gnome.system.proxy.ftp'],
+            size_group)
+
+        manual_proxy_box.pack_start(box_ftp, False, False, 0)
+        box_ftp.show()
+
+        box_socks = HostPortSettingBox(
+            _('SOCKS Proxy:'),
+            self._proxy_settings['org.gnome.system.proxy.socks'], size_group)
+
+        manual_proxy_box.pack_start(box_socks, False, False, 0)
+        box_socks.show()
 
     def setup(self):
         self._entry.set_text(self._model.get_jabber())
@@ -205,6 +463,12 @@ class Network(SectionView):
         self._model.undo()
         self._jabber_alert.hide()
         self._radio_alert.hide()
+        for setting in self._proxy_settings.values():
+            setting.revert()
+
+    def apply(self):
+        for setting in self._proxy_settings.values():
+            setting.apply()
 
     def _validate(self):
         if self._jabber_valid and self._radio_valid:
