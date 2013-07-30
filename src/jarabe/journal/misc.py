@@ -58,6 +58,22 @@ def _get_icon_for_mime(mime_type):
             return file_name
 
 
+def get_mount_icon_name(mount, size=None):
+    name = 'drive'
+    icon = mount.get_icon()
+    if isinstance(icon, Gio.ThemedIcon):
+        icon_theme = Gtk.IconTheme.get_default()
+        for icon_name in icon.props.names:
+            if (size is not None and
+                icon_theme.lookup_icon(icon_name, size, 0) is not None) or \
+                    (size is None and icon_theme.has_icon(icon_name)):
+                name = icon_name
+                break
+    else:
+        logging.error('Cannot find icon names for %s, %s', icon, mount)
+    return name
+
+
 def get_icon_name(metadata):
     file_name = None
 
