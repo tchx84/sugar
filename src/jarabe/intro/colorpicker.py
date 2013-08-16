@@ -17,9 +17,11 @@
 from gi.repository import Gtk
 from gi.repository import Gdk
 
-from sugar3.graphics.icon import Icon
+from sugar3.graphics.icon import EventIcon
 from sugar3.graphics import style
 from sugar3.graphics.xocolor import XoColor
+
+import logging
 
 
 class ColorPicker(Gtk.EventBox):
@@ -27,7 +29,7 @@ class ColorPicker(Gtk.EventBox):
         Gtk.EventBox.__init__(self)
         self._xo_color = None
 
-        self._xo = Icon(pixel_size=style.XLARGE_ICON_SIZE,
+        self._xo = EventIcon(pixel_size=style.XLARGE_ICON_SIZE,
                         icon_name='computer-xo')
         self._set_random_colors()
         self.connect('button-press-event', self._button_press_cb)
@@ -35,6 +37,7 @@ class ColorPicker(Gtk.EventBox):
 
     def _button_press_cb(self, widget, event):
         if event.button == 1 and event.type == Gdk.EventType.BUTTON_PRESS:
+            logging.error('selecting random color')
             self._set_random_colors()
 
     def get_color(self):
