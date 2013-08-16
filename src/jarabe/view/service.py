@@ -65,6 +65,12 @@ class UIService(dbus.service.Object):
             return ''
 
     @dbus.service.method(_DBUS_SHELL_IFACE,
+                         in_signature='ssb', out_signature='')
+    def SetBundleFavorite(self, bundle_id, version, favorite):
+        bundleregistry.get_registry().set_bundle_favorite(
+            bundle_id, version, favorite)
+
+    @dbus.service.method(_DBUS_SHELL_IFACE,
                          in_signature='s', out_signature='b')
     def ActivateActivity(self, activity_id):
         """Switch to the window related to this activity_id and return a
