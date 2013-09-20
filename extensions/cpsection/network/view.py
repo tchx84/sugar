@@ -58,7 +58,7 @@ class SettingBox(Gtk.HBox):
 class ComboSettingBox(Gtk.VBox):
 
     __gsignals__ = {
-        'profile-selected': (GObject.SignalFlags.RUN_FIRST, None, ([object])),
+        'changed': (GObject.SignalFlags.RUN_FIRST, None, ([])),
     }
 
     """
@@ -77,17 +77,17 @@ class ComboSettingBox(Gtk.VBox):
         setting_box.show()
 
         model = Gtk.ListStore(str, str, object, object)
-        self._combo_box = Gtk.ComboBox(model=model)
-        self._combo_box.connect('changed', self.__combo_changed_cb)
-        setting_box.pack_start(self._combo_box, True, True, 0)
-        self._combo_box.show()
+        self.combo_box = Gtk.ComboBox(model=model)
+        self.combo_box.connect('changed', self.__combo_changed_cb)
+        setting_box.pack_start(self.combo_box, True, True, 0)
+        self.combo_box.show()
 
         cell_renderer = Gtk.CellRendererText()
         cell_renderer.props.ellipsize = Pango.EllipsizeMode.MIDDLE
         cell_renderer.props.ellipsize_set = True
-        self._combo_box.pack_start(cell_renderer, True)
-        self._combo_box.add_attribute(cell_renderer, 'text', 0)
-        self._combo_box.props.id_column = 1
+        self.combo_box.pack_start(cell_renderer, True)
+        self.combo_box.add_attribute(cell_renderer, 'text', 0)
+        self.combo_box.props.id_column = 1
 
         self._settings_box = Gtk.VBox()
         self._settings_box.show()
@@ -96,12 +96,29 @@ class ComboSettingBox(Gtk.VBox):
         for optset in option_sets:
             model.append(optset)
 
-        setting.bind(setting_key, self._combo_box, 'active-id',
+        setting.bind(setting_key, self.combo_box, 'active-id',
                      Gio.SettingsBindFlags.DEFAULT)
 
     def __combo_changed_cb(self, combobox):
-        giter = combobox.get_active_iter()
-        new_box = combobox.get_model().get(giter, 2)[0]
+        self.emit('changed')
+
+
+class ProxyModeCombo(ComboSettingBox):
+
+    __gsignals__ = {
+        'profile-selected': (GObject.SignalFlags.RUN_FIRST, None, ([object])),
+    }
+
+    def __init__(self, name, setting, setting_key,
+                 option_sets, size_group=None):
+        ComboSettingBox.__init__(self, name, setting, setting_key,
+                 option_sets, size_group)
+
+        self.connect('changed', self.__combo_changed_cb)
+
+    def __combo_changed_cb(self, combo_setting_box):
+        giter = combo_setting_box.combo_box.get_active_iter()
+        new_box = combo_setting_box.combo_box.get_model().get(giter, 2)[0]
         current_box = self._settings_box.get_children()
         if current_box:
             self._settings_box.remove(current_box[0])
@@ -109,14 +126,15 @@ class ComboSettingBox(Gtk.VBox):
         self._settings_box.add(new_box)
         new_box.show()
 
-        profile = combobox.get_model().get(giter, 3)[0]
+        profile = combo_setting_box.combo_box.get_model().get(giter, 3)[0]
         self.emit('profile-selected', profile)
 
     def set_active(self, active):
-        self._combo_box.set_active(active)
-        giter = self._combo_box.get_active_iter()
-        profile = self._combo_box.get_model().get(giter, 3)[0]
+        self.combo_box.set_active(active)
+        giter = self.combo_box.get_active_iter()
+        profile = self.combo_box.get_model().get(giter, 3)[0]
         self.emit('profile-selected', profile)
+
 
 
 class OptionalSettingsBox(Gtk.VBox):
@@ -451,7 +469,7 @@ class Network(SectionView):
             index = len(option_sets) - 1
             proxy_profiles_index[proxy_profile['title']] = index
 
-        box_mode = ComboSettingBox(
+        box_mode = ProxyModeCombo(
             _('Method:'), self._proxy_settings['org.gnome.system.proxy'],
             'mode', option_sets, size_group)
         box_mode.connect('profile-selected', self._apply_proxy_profile)
