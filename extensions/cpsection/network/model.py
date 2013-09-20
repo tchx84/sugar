@@ -221,7 +221,7 @@ def parameter_as_boolean(profile, parameter):
 
 class HiddenNetworkManager():
 
-    def __init__(self):
+    def __init__(self, conn_profiles={}):
         client = GConf.Client.get_default()
         self.enabled = client.get_bool(
             '/desktop/sugar/extensions/network/conf_hidden_ssid')
@@ -236,6 +236,14 @@ class HiddenNetworkManager():
 
         self._netmgr.GetDevices(reply_handler=self.__get_devices_reply_cb,
                                 error_handler=self.__get_devices_error_cb)
+
+        # get the list of connectivity profiles of type "connectivity"
+        self.network_profiles = []
+        logging.error('profiles %s', conn_profiles)
+        for profile_key in conn_profiles:
+            profile = conn_profiles[profile_key]
+            if profile['type'] == 'connectivity':
+                self.network_profiles.append(profile)
 
     def __get_devices_reply_cb(self, devices_o):
         for dev_o in devices_o:

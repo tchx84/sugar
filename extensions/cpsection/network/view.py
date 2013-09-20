@@ -68,8 +68,7 @@ class ComboSettingBox(Gtk.VBox):
     Renders the top level setting as a ComboBox.  Only the currently
     active set is shown on screen.
     """
-    def __init__(self, name, setting, setting_key,
-                 option_sets, size_group=None):
+    def __init__(self, name, option_sets, size_group=None):
         Gtk.VBox.__init__(self, spacing=style.DEFAULT_SPACING)
 
         setting_box = SettingBox(name, size_group)
@@ -96,9 +95,6 @@ class ComboSettingBox(Gtk.VBox):
         for optset in option_sets:
             model.append(optset)
 
-        setting.bind(setting_key, self.combo_box, 'active-id',
-                     Gio.SettingsBindFlags.DEFAULT)
-
     def __combo_changed_cb(self, combobox):
         self.emit('changed')
 
@@ -111,8 +107,10 @@ class ProxyModeCombo(ComboSettingBox):
 
     def __init__(self, name, setting, setting_key,
                  option_sets, size_group=None):
-        ComboSettingBox.__init__(self, name, setting, setting_key,
-                 option_sets, size_group)
+        ComboSettingBox.__init__(self, name, option_sets, size_group)
+
+        setting.bind(setting_key, self.combo_box, 'active-id',
+                     Gio.SettingsBindFlags.DEFAULT)
 
         self.connect('changed', self.__combo_changed_cb)
 
@@ -134,7 +132,6 @@ class ProxyModeCombo(ComboSettingBox):
         giter = self.combo_box.get_active_iter()
         profile = self.combo_box.get_model().get(giter, 3)[0]
         self.emit('profile-selected', profile)
-
 
 
 class OptionalSettingsBox(Gtk.VBox):
@@ -368,7 +365,8 @@ class Network(SectionView):
         # read connectivity profiles if available
         self._connectivity_profiles = self._model.get_connectivity_profiles()
 
-        self._hidden_conn_manager = HiddenNetworkManager()
+        self._hidden_conn_manager = HiddenNetworkManager(
+            self._connectivity_profiles)
         if self._hidden_conn_manager.enabled:
             self._add_hidden_ssid_section(workspace)
 
@@ -389,21 +387,96 @@ class Network(SectionView):
         box_hidden_network.set_border_width(style.DEFAULT_SPACING * 2)
         box_hidden_network.set_spacing(style.DEFAULT_SPACING)
 
-        info = Gtk.Label(_("Enter the name of the hidden network"))
-        info.set_alignment(0, 0)
-        info.set_line_wrap(True)
-        box_hidden_network.pack_start(info, False, False, 0)
-        info.show()
+        size_group = Gtk.SizeGroup(Gtk.SizeGroupMode.HORIZONTAL)
+
+        if len(self._hidden_conn_manager.network_profiles) > 0:
+
+            option_sets = [('No security', '', Gtk.VBox(), None)]
+
+            # load the network profiles in the option_sets
+            network_profiles_index = {}
+            for network_profile in self._hidden_conn_manager.network_profiles:
+                box = Gtk.VBox()
+
+                # look for all the properties in the network profile
+                # configured as REQUEST
+                # first sort the properties (username, password, other)
+                # and set better labels
+                # the names of the fields are from:
+                # https://projects.gnome.org/NetworkManager/developers/api/09/
+                #                                            ref-settings.html
+                filters = [('802-1x.identity',
+                            '802-11-wireless-security.leap-username'),
+                           ('802-1x.password',
+                            '802-11-wireless-security.leap-password'),
+                           None]
+                labels = [_('Username:'), _('Password:')]
+                count = 0
+                for property_filter in filters:
+                    for key in network_profile.keys():
+                        if network_profile[key].upper() == 'REQUEST':
+                            field_ok = True
+                            if property_filter is not None:
+                                if key not in property_filter:
+                                    field_ok = False
+                            else:
+                                if key in filters[0] or key in filters[1]:
+                                    field_ok = False
+                            if field_ok:
+                                if count < len(labels):
+                                    label = labels[count]
+                                else:
+                                    label = key
+                                setting_box = SettingBox(label, size_group)
+                                setting_box.set_border_width(
+                                    style.DEFAULT_SPACING)
+                                setting_box.set_spacing(style.DEFAULT_SPACING)
+                                entry = Gtk.Entry()
+                                setting_box.pack_start(entry, True, True, 0)
+                                box.pack_start(setting_box, True, True, 0)
+                    count = count + 1
+                box.show_all()
+
+                option_sets.append((network_profile['title'], '',
+                                    box, network_profile))
+                index = len(option_sets) - 1
+                network_profiles_index[network_profile['title']] = index
+
+            box_mode = ComboSettingBox(_('Mode:'), option_sets, size_group)
+            box_mode.connect('changed', self._select_hidden_network_profile)
+
+            box_hidden_network.pack_start(box_mode, False, False, 0)
+            box_mode.show()
+
+        name_box = SettingBox(_("Name"), size_group)
+        name_box.show()
 
         self._hidden_network_name_entry = Gtk.Entry()
         self._hidden_network_name_entry.set_text(
             self._hidden_conn_manager.get_hidden_ssid())
-        box_hidden_network.pack_start(self._hidden_network_name_entry, False,
-                                      False, 0)
+        name_box.pack_start(self._hidden_network_name_entry, False, False, 0)
         self._hidden_network_name_entry.show()
+        box_hidden_network.pack_start(name_box, False, False, 0)
+
+        self._hidden_network_params_box = Gtk.VBox()
+        self._hidden_network_params_box.show()
+        box_hidden_network.pack_start(self._hidden_network_params_box, False,
+                                      False, 0)
 
         workspace.pack_start(box_hidden_network, False, False, 0)
         box_hidden_network.show()
+
+    def _select_hidden_network_profile(self, combo_setting_box):
+        giter = combo_setting_box.combo_box.get_active_iter()
+        new_box = combo_setting_box.combo_box.get_model().get(giter, 2)[0]
+        current_box = self._hidden_network_params_box.get_children()
+        if current_box:
+            self._hidden_network_params_box.remove(current_box[0])
+
+        self._hidden_network_params_box.add(new_box)
+        new_box.show()
+        # TODO: apply profile
+        #profile = combo_setting_box.combo_box.get_model().get(giter, 3)[0]
 
     def _add_proxy_section(self, workspace):
         separator_hidden_network = Gtk.HSeparator()
