@@ -516,6 +516,7 @@ class Settings(object):
         self.connection = ConnectionSettings()
         self.ip4_config = None
         self.wireless_security = None
+        self.wpa_eap_setting = None
 
         if wireless_cfg is not None:
             self.wireless = wireless_cfg
@@ -531,6 +532,8 @@ class Settings(object):
                 self.wireless_security.get_dict()
         if self.ip4_config is not None:
             settings['ipv4'] = self.ip4_config.get_dict()
+        if self.wpa_eap_setting is not None:
+            settings['802-1x'] = self.wpa_eap_setting
         return settings
 
 

@@ -23,9 +23,14 @@ from gi.repository import Gdk
 
 import dbus
 
+import os
+import shutil
+
+from sugar3 import env
+from sugar3.graphics.icon import Icon
 from sugar3.graphics import style
 from jarabe.model import network
-
+from jarabe.journal.objectchooser import ObjectChooser
 
 IW_AUTH_ALG_OPEN_SYSTEM = 'open'
 IW_AUTH_ALG_SHARED_KEY = 'shared'
@@ -33,6 +38,10 @@ IW_AUTH_ALG_SHARED_KEY = 'shared'
 WEP_PASSPHRASE = 1
 WEP_HEX = 2
 WEP_ASCII = 3
+
+SETTING_TYPE_STRING = 1
+SETTING_TYPE_LIST = 2
+SETTING_TYPE_CHOOSER = 3
 
 
 def string_is_hex(key):
@@ -73,6 +82,220 @@ class CanceledKeyRequestError(dbus.DBusException):
     def __init__(self):
         dbus.DBusException.__init__(self)
         self._dbus_error_name = network.NM_SETTINGS_IFACE + '.CanceledError'
+
+
+class NetworkParameters(Gtk.HBox):
+    def __init__(self, auth_param):
+        Gtk.HBox.__init__(self, homogeneous=True)
+        self._key = auth_param._key_name
+        self._label = Gtk.Label(_(auth_param._key_label))
+        self._key_type = auth_param._key_type
+        self._auth_param = auth_param
+
+        self.pack_start(self._label, True, True, 0)
+        self._label.show()
+
+        if self._is_entry():
+            self._entry = Gtk.Entry()
+            self.pack_start(self._entry, True, True, 0)
+            self._entry.show()
+        elif self._is_liststore():
+            self._option_store = Gtk.ListStore(str, str)
+            for option in auth_param._options:
+                self._option_store.append(option)
+
+            self._entry = auth_param._options[0][1]
+            self._option_combo = Gtk.ComboBox(model=self._option_store)
+            cell = Gtk.CellRendererText()
+            self._option_combo.pack_start(cell, True)
+            self._option_combo.add_attribute(cell, 'text', 0)
+            self._option_combo.set_active(0)
+            self._option_combo.connect('changed',
+                                       self._option_combo_changed_cb)
+            self.pack_start(self._option_combo, True, True, 0)
+            self.show()
+            self._option_combo.show()
+        elif self._is_chooser():
+            self._chooser_button = Gtk.Button(_('Choose..'))
+            self._chooser_button.connect('clicked', self._object_chooser_cb)
+            self.pack_start(self._chooser_button, True, True, 0)
+            self._chooser_button.show()
+            self._entry = ''
+
+    def _is_entry(self):
+        return (not self._is_chooser()) and \
+               (len(self._auth_param._options) == 0)
+
+    def _is_liststore(self):
+        return (not self._is_chooser()) and \
+               (len(self._auth_param._options) > 0)
+
+    def _is_chooser(self):
+        return self._key_type == SETTING_TYPE_CHOOSER
+
+    def _object_chooser_cb(self, chooser_button):
+        self._want_document = True
+        self._show_picker_cb()
+
+    def _show_picker_cb(self):
+        if not self._want_document:
+            return
+        chooser = ObjectChooser()
+
+        try:
+            result = chooser.run()
+            if result == Gtk.ResponseType.ACCEPT:
+                jobject = chooser.get_selected_object()
+                if jobject and jobject.file_path:
+                    file_basename = os.path.basename(
+                        jobject._metadata._properties['title'])
+                    self._chooser_button.set_label(file_basename)
+
+                    profile_path = env.get_profile_path()
+                    self._entry = os.path.join(profile_path, file_basename)
+
+                    # Remove (older) file, if it exists.
+                    if os.path.exists(self._entry):
+                        os.remove(self._entry)
+
+                    # Copy the file.
+                    shutil.copy2(jobject.file_path, self._entry)
+
+        finally:
+            chooser.destroy()
+            del chooser
+
+    def _option_combo_changed_cb(self, widget):
+        it = self._option_combo.get_active_iter()
+        (value, ) = self._option_store.get(it, 1)
+        self._entry = value
+
+    def _get_key(self):
+        return self._key
+
+    def _get_value(self):
+        if self._is_entry():
+            return self._entry.get_text()
+        elif self._is_liststore():
+            return self._entry
+        elif self._is_chooser():
+            if len(self._entry) > 0:
+                return dbus.ByteArray('file://' + self._entry + '\0')
+            else:
+                return self._entry
+
+
+class KeyValuesDialog(Gtk.Dialog):
+    def __init__(self, auth_lists, final_callback, settings):
+        # This must not be "modal", else the "chooser" widgets won't
+        # accept anything !!
+        Gtk.Dialog.__init__(self)
+        self.set_title(_('Wireless Parameters required'))
+
+        self._spacing_between_children_widgets = 5
+        self._auth_lists = auth_lists
+        self._final_callback = final_callback
+        self._settings = settings
+
+        label = Gtk.Label(_("Please enter parameters\n"))
+        self.vbox.set_spacing(self._spacing_between_children_widgets)
+        self.vbox.pack_start(label, True, True, 0)
+
+        self._auth_type_store = Gtk.ListStore(str, str)
+        for auth_list in self._auth_lists:
+            self._auth_type_store.append([auth_list._auth_label,
+                                          auth_list._auth_type])
+
+        self._auth_type_combo = Gtk.ComboBox(model=self._auth_type_store)
+        cell = Gtk.CellRendererText()
+        self._auth_type_combo.pack_start(cell, True)
+        self._auth_type_combo.add_attribute(cell, 'text', 0)
+        self._auth_type_combo.set_active(0)
+        self._auth_type_combo.connect('changed',
+                                      self._auth_type_combo_changed_cb)
+        self._auth_type_box = Gtk.HBox(homogeneous=True)
+        self._auth_label = Gtk.Label(_('Authentication'))
+        self._auth_type_box.pack_start(self._auth_label, True, True, 0)
+        self._auth_type_box.pack_start(self._auth_type_combo,
+                                       True, True, 0)
+        self.vbox.pack_start(self._auth_type_box, True, True, 0)
+        self._auth_label.show()
+        self._auth_type_combo.show()
+
+        button = Gtk.Button()
+        button.set_image(Icon(icon_name='dialog-cancel'))
+        button.set_label(_('Cancel'))
+        self.add_action_widget(button, Gtk.ResponseType.CANCEL)
+        button = Gtk.Button()
+        button.set_image(Icon(icon_name='dialog-ok'))
+        button.set_label(_('Ok'))
+        self.add_action_widget(button, Gtk.ResponseType.OK)
+        self.set_default_response(Gtk.ResponseType.OK)
+
+        self.connect('response', self._fetch_values)
+
+        auth_type = self._auth_lists[0]._auth_type
+        self._selected_auth_list = self._select_auth_list(auth_type)
+        self._add_key_value('eap', auth_type)
+        self._add_container_box()
+
+    def _auth_type_combo_changed_cb(self, widget):
+        it = self._auth_type_combo.get_active_iter()
+        (auth_type, ) = self._auth_type_store.get(it, 1)
+        self._selected_auth_list = self._select_auth_list(auth_type)
+        self._add_key_value('eap', auth_type)
+        self._reset()
+
+    def _select_auth_list(self, auth_type):
+        for auth_list in self._auth_lists:
+            if auth_list._params_list[0]._options[0][1] == auth_type:
+                return auth_list
+
+    def _populate_auth_params(self, auth_list):
+        for auth_param in auth_list._params_list[1:]:
+            obj = NetworkParameters(auth_param)
+            self._key_values_box.pack_start(obj, True, True, 0)
+            obj.show()
+
+    def _reset(self):
+        self.vbox.remove(self._key_values_box)
+        self._add_container_box()
+
+    def _add_container_box(self):
+        self._key_values_box = Gtk.VBox(
+            spacing=self._spacing_between_children_widgets)
+        self.vbox.pack_start(self._key_values_box, True, True, 0)
+        self._key_values_box.show()
+        self._populate_auth_params(self._selected_auth_list)
+
+    def _remove_all_params(self):
+        self._key_values_box.remove_all()
+
+    def _fetch_values(self, key_dialog, response_id):
+        if response_id == Gtk.ResponseType.OK:
+            for child in self._key_values_box.get_children():
+                key = child._get_key()
+                value = child._get_value()
+                self._add_key_value(key, value)
+
+            key_dialog.destroy()
+            self._final_callback(self._settings,
+                                 self._selected_auth_list)
+        else:
+            response = key_dialog.get_response_object()
+            response.set_error(CanceledKeyRequestError())
+            key_dialog.destroy()
+
+    def _add_key_value(self, key, value):
+        for auth_param in self._selected_auth_list._params_list:
+            if auth_param._key_name == key:
+                if (auth_param._key_type == SETTING_TYPE_STRING) or \
+                   (auth_param._key_type == SETTING_TYPE_CHOOSER):
+                    auth_param._value = value
+                elif auth_param._key_type == SETTING_TYPE_LIST:
+                    values = []
+                    values.append(value)
+                    auth_param._value = values
 
 
 class KeyDialog(Gtk.Dialog):
@@ -214,7 +437,7 @@ class WEPKeyDialog(KeyDialog):
         self.set_response_sensitive(Gtk.ResponseType.OK, valid)
 
 
-class WPAKeyDialog(KeyDialog):
+class WPAPersonalKeyDialog(KeyDialog):
     def __init__(self, ssid, flags, wpa_flags, rsn_flags, dev_caps, response):
         KeyDialog.__init__(self, ssid, flags, wpa_flags, rsn_flags,
                            dev_caps, response)
@@ -267,15 +490,26 @@ def create(ssid, flags, wpa_flags, rsn_flags, dev_caps, response):
             rsn_flags == network.NM_802_11_AP_SEC_NONE:
         key_dialog = WEPKeyDialog(ssid, flags, wpa_flags, rsn_flags,
                                   dev_caps, response)
-    else:
-        key_dialog = WPAKeyDialog(ssid, flags, wpa_flags, rsn_flags,
-                                  dev_caps, response)
-
+    elif (wpa_flags & network.NM_802_11_AP_SEC_KEY_MGMT_PSK) or \
+            (rsn_flags & network.NM_802_11_AP_SEC_KEY_MGMT_PSK):
+        key_dialog = WPAPersonalKeyDialog(ssid, flags, wpa_flags, rsn_flags,
+                                          dev_caps, response)
+    elif (wpa_flags & network.NM_802_11_AP_SEC_KEY_MGMT_802_1X) or \
+            (rsn_flags & network.NM_802_11_AP_SEC_KEY_MGMT_802_1X):
+        # nothing. All details are asked for WPA/WPA2-Enterprise
+        # networks, before the conneection-activation is done.
+        return
     key_dialog.connect('response', _key_dialog_response_cb)
     key_dialog.show_all()
     width, height = key_dialog.get_size()
     key_dialog.move(Gdk.Screen.width() / 2 - width / 2,
                     style.GRID_CELL_SIZE * 2)
+
+
+def get_key_values(key_list, final_callback, settings):
+    key_dialog = KeyValuesDialog(key_list, final_callback,
+                                 settings)
+    key_dialog.show_all()
 
 
 def _key_dialog_response_cb(key_dialog, response_id):

@@ -50,6 +50,92 @@ _OLPC_MESH_ICON_NAME = 'network-mesh'
 
 _FILTERED_ALPHA = 0.33
 
+SETTING_TYPE_STRING = 1
+SETTING_TYPE_LIST = 2
+SETTING_TYPE_CHOOSER = 3
+
+
+class AuthenticationType:
+    def __init__(self, auth_label, auth_type, params_list):
+        self._auth_label = auth_label
+        self._auth_type = auth_type
+        self._params_list = params_list
+
+
+class AuthenticationParameter:
+    def __init__(self, key_name, key_label, key_type, options):
+        self._key_name = key_name
+        self._key_label = key_label
+        self._key_type = key_type
+        self._options = options
+        self._value = None
+
+
+AUTHENTICATION_LIST = [
+
+    AuthenticationType('TLS', 'tls', [
+        AuthenticationParameter('eap', 'Authentication', SETTING_TYPE_LIST,
+                                [['TLS', 'tls']]),
+        AuthenticationParameter('identity', 'Identity', SETTING_TYPE_STRING,
+                                []),
+        AuthenticationParameter('client-cert', 'User certificate',
+                                SETTING_TYPE_CHOOSER, []),
+        AuthenticationParameter('ca-cert', 'CA certificate',
+                                SETTING_TYPE_CHOOSER, []),
+        AuthenticationParameter('private-key', 'Private key',
+                                SETTING_TYPE_CHOOSER, []),
+        AuthenticationParameter('private-key-password',
+                                'Private Key password', SETTING_TYPE_STRING,
+                                [])]),
+
+    AuthenticationType('LEAP', 'leap', [
+        AuthenticationParameter('eap', 'Authentication', SETTING_TYPE_LIST,
+                                [['LEAP', 'leap']]),
+        AuthenticationParameter('identity', 'Username', SETTING_TYPE_STRING,
+                                []),
+        AuthenticationParameter('password', 'Password', SETTING_TYPE_STRING,
+                                [])]),
+
+    AuthenticationType('Tunnelled TLS', 'ttls', [
+        AuthenticationParameter('eap', 'Authentication', SETTING_TYPE_LIST,
+                                [['Tunnelled TLS', 'ttls']]),
+        AuthenticationParameter('anonymous-identity', 'Anonymous identity',
+                                SETTING_TYPE_STRING, []),
+        AuthenticationParameter('ca-cert', 'CA certificate',
+                                SETTING_TYPE_CHOOSER, []),
+        AuthenticationParameter('phase2-auth', 'Inner Authentication',
+                                SETTING_TYPE_STRING,
+                                [['PAP', 'pap'],
+                                ['MSCHAP', 'mschap'],
+                                ['MSCHAPv2', 'mschapv2'],
+                                ['CHAP', 'chap']]),
+        AuthenticationParameter('identity', 'Username', SETTING_TYPE_STRING,
+                                []),
+        AuthenticationParameter('password', 'Password', SETTING_TYPE_STRING,
+                                [])]),
+
+    AuthenticationType('Protected EAP (PEAP)', 'peap', [
+        AuthenticationParameter('eap', 'Authentication', SETTING_TYPE_LIST,
+                                [['Protected EAP (PEAP)', 'peap']]),
+        AuthenticationParameter('anonymous-identity', 'Anonymous identity',
+                                SETTING_TYPE_STRING, []),
+        AuthenticationParameter('ca-cert', 'CA certificate',
+                                SETTING_TYPE_CHOOSER, []),
+        AuthenticationParameter('phase1-peapver', 'PEAP version',
+                                SETTING_TYPE_STRING,
+                                [['Automatic', ''],
+                                ['Version 0', '0'],
+                                ['Version 1', '1']]),
+        AuthenticationParameter('phase2-auth', 'Inner Authentication',
+                                SETTING_TYPE_STRING,
+                                [['MSCHAPv2', 'mschapv2'],
+                                ['MD5', 'md5'],
+                                ['GTC', 'gtc']]),
+        AuthenticationParameter('identity', 'Username', SETTING_TYPE_STRING,
+                                []),
+        AuthenticationParameter('password', 'Password', SETTING_TYPE_STRING,
+                                [])])]
+
 
 class WirelessNetworkView(EventPulsingIcon):
     def __init__(self, initial_ap):
@@ -322,7 +408,7 @@ class WirelessNetworkView(EventPulsingIcon):
             group = self._add_ciphers_from_flags(self._rsn_flags, False)
             wireless_security = WirelessSecurity()
             wireless_security.key_mgmt = 'wpa-psk'
-            wireless_security.proto = 'rsn'
+            wireless_security.proto = ['rsn']
             wireless_security.pairwise = pairwise
             wireless_security.group = group
             return wireless_security
@@ -334,7 +420,31 @@ class WirelessNetworkView(EventPulsingIcon):
             group = self._add_ciphers_from_flags(self._wpa_flags, False)
             wireless_security = WirelessSecurity()
             wireless_security.key_mgmt = 'wpa-psk'
-            wireless_security.proto = 'wpa'
+            wireless_security.proto = ['wpa']
+            wireless_security.pairwise = pairwise
+            wireless_security.group = group
+            return wireless_security
+
+        if (self._rsn_flags & network.NM_802_11_AP_SEC_KEY_MGMT_802_1X) and \
+                (self._device_caps & network.NM_WIFI_DEVICE_CAP_RSN):
+            # WPA2 Enterprise
+            pairwise = self._add_ciphers_from_flags(self._rsn_flags, True)
+            group = self._add_ciphers_from_flags(self._rsn_flags, False)
+            wireless_security = WirelessSecurity()
+            wireless_security.key_mgmt = 'wpa-eap'
+            wireless_security.proto = ['rsn']
+            wireless_security.pairwise = pairwise
+            wireless_security.group = group
+            return wireless_security
+
+        if (self._wpa_flags & network.NM_802_11_AP_SEC_KEY_MGMT_802_1X) and \
+                (self._device_caps & network.NM_WIFI_DEVICE_CAP_WPA):
+            # WPA Enterprise
+            pairwise = self._add_ciphers_from_flags(self._wpa_flags, True)
+            group = self._add_ciphers_from_flags(self._wpa_flags, False)
+            wireless_security = WirelessSecurity()
+            wireless_security.key_mgmt = 'wpa-eap'
+            wireless_security.proto = ['wpa']
             wireless_security.pairwise = pairwise
             wireless_security.group = group
             return wireless_security
@@ -373,6 +483,34 @@ class WirelessNetworkView(EventPulsingIcon):
 
         if wireless_security is not None:
             settings.wireless.security = '802-11-wireless-security'
+
+        # Take in the settings, if applicable.
+        if (wireless_security is not None) and \
+                ((wireless_security.key_mgmt == 'ieee8021x') or
+                 (wireless_security.key_mgmt == 'wpa-eap')):
+            keydialog.get_key_values(AUTHENTICATION_LIST,
+                                     self.__add_and_activate_connection,
+                                     settings)
+        else:
+            self.__add_and_activate_connection(settings)
+
+    def __add_and_activate_connection(self, settings,
+                                      additional_settings=None):
+        if additional_settings is not None:
+            key_value_dict = {}
+            auth_params_list = additional_settings._params_list
+
+            for auth_param in auth_params_list:
+                key = auth_param._key_name
+                value = auth_param._value
+                logging.debug('key == %s', key)
+                logging.debug('value == %s', value)
+                if len(value) > 0:
+                    key_value_dict[key] = value
+                else:
+                    logging.debug('Not setting empty value for key :%s', key)
+
+            settings.wpa_eap_setting = key_value_dict
 
         network.add_and_activate_connection(self._device, settings,
                                             self.get_first_ap().model)
