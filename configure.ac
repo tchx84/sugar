@@ -66,6 +66,8 @@ extensions/cpsection/webaccount/Makefile
 extensions/deviceicon/Makefile
 extensions/globalkey/Makefile
 extensions/webservice/Makefile
+extensions/webservice/teachershare/Makefile
+extensions/webservice/teachershare/teachershare/Makefile
 extensions/Makefile
 Makefile
 po/Makefile.in
