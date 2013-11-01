@@ -755,6 +755,11 @@ class ShellModel(GObject.GObject):
     def has_modal(self):
         return self._modal_dialogs_counter > 0
 
+    def stop_all_activities(self):
+        # This method should be used only at sugar shutdown
+        for home_activity in self._activities:
+            home_activity.stop()
+
 
 def get_model():
     global _model

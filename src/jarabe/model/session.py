@@ -62,10 +62,16 @@ class SessionManager(GObject.GObject):
     def initiate_shutdown(self, logout_mode):
         self._logout_mode = logout_mode
         self.shutdown_signal.emit()
+
+        # if sugar can't close in 30 seconds, try this
+        GObject.timeout_add_seconds(30, self.__close_activities)
         self.session.initiate_shutdown()
 
     def __shutdown_completed_cb(self, session):
         GObject.timeout_add_seconds(self.SHUTDOWN_TIMEOUT, self._try_shutdown)
+
+    def __close_activities(self):
+        self._shell_model.stop_all_activities()
 
     def _try_shutdown(self):
         if len(self._shell_model) > 0:
