@@ -834,6 +834,9 @@ class Network(SectionView):
             setting.apply()
         self._model.set_proxy_profile_name(self._proxy_profile_name)
 
+        if self._hidden_conn_manager.enabled:
+            self.__connect_hidden_net_cb(None)
+
     def _validate(self):
         if self._jabber_valid and self._radio_valid:
             self.props.is_valid = True
