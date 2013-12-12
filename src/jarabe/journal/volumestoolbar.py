@@ -39,7 +39,7 @@ from sugar3 import env
 
 from jarabe.journal import model
 from jarabe.journal.misc import get_mount_icon_name
-from jarabe.view.palettes import VolumePalette
+from jarabe.view.palettes import JournalVolumePalette
 
 
 _JOURNAL_0_METADATA_DIR = '.olpc.store'
@@ -327,7 +327,7 @@ class VolumeButton(BaseButton):
         self.props.xo_color = color
 
     def create_palette(self):
-        palette = VolumePalette(self._mount)
+        palette = JournalVolumePalette(self._mount)
         # palette.props.invoker = FrameWidgetInvoker(self)
         # palette.set_group_id('frame')
         return palette

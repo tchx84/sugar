@@ -1,7 +1,9 @@
 python_scripts =		\
 	sugar-control-panel	\
 	sugar-install-bundle	\
-	sugar-launch
+	sugar-launch \
+	journal-backup-volume	\
+	journal-restore-volume
 
 bin_SCRIPTS = 			\
 	sugar			\

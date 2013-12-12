@@ -73,6 +73,9 @@ src/jarabe/journal/palettes.py
 src/jarabe/journal/volumestoolbar.py
 src/jarabe/journal/iconmodel.py
 src/jarabe/journal/iconview.py
+src/jarabe/journal/processdialog.py
+src/jarabe/journal/volumestoolbar.py
+src/jarabe/model/processmanagement.py
 src/jarabe/model/network.py
 src/jarabe/view/alerts.py
 src/jarabe/view/buddymenu.py

@@ -17,4 +17,5 @@ sugar_PYTHON =				\
 	model.py			\
 	objectchooser.py		\
 	palettes.py			\
+	processdialog.py	\
 	volumestoolbar.py

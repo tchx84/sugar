@@ -375,3 +375,53 @@ def get_icon_color(metadata):
         return XoColor(client.get_string('/desktop/sugar/user/color'))
     else:
         return XoColor(metadata['icon-color'])
+
+
+# BACKUP SUPPORT METHODS
+
+_NOT_AVAILABLE = _('Not available')
+
+
+def _get_xo_serial():
+    _OFW_TREE = '/ofw'
+    _PROC_TREE = '/proc/device-tree'
+    _SN = 'serial-number'
+
+    serial_no = None
+    if os.path.exists(os.path.join(_OFW_TREE, _SN)):
+        serial_no = _read_file(os.path.join(_OFW_TREE, _SN))
+    elif os.path.exists(os.path.join(_PROC_TREE, _SN)):
+        serial_no = _read_file(os.path.join(_PROC_TREE, _SN))
+
+    if serial_no is None:
+        serial_no = _NOT_AVAILABLE
+
+    # Remove the trailing binary character, else DBUS will crash.
+    return serial_no.rstrip('\x00')
+
+
+def _read_file(path):
+    if os.access(path, os.R_OK) == 0:
+        return None
+
+    fd = open(path, 'r')
+    value = fd.read()
+    fd.close()
+    if value:
+        value = value.strip('\n')
+        return value
+    else:
+        logging.debug('No information in file or directory: %s', path)
+        return None
+
+
+def _get_nick():
+    client = GConf.Client.get_default()
+    return client.get_string("/desktop/sugar/user/nick")
+
+
+def get_backup_identifier():
+    identifier = _get_xo_serial()
+    if identifier is _NOT_AVAILABLE:
+        identifier = _get_nick()
+    return identifier
