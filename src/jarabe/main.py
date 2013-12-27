@@ -268,6 +268,10 @@ def _check_profile():
 
 
 def main():
+
+    # set env variable to use webkit1
+    os.environ['SUGAR_USE_WEBKIT1'] = 'yes'
+
     # This can be removed once pygobject-3.10 is a requirement.
     # https://bugzilla.gnome.org/show_bug.cgi?id=686914
     GLib.threads_init()
