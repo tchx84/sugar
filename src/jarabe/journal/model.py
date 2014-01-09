@@ -38,6 +38,7 @@ from sugar3 import dispatch
 from sugar3 import mime
 from sugar3 import util
 
+from jarabe.webservice import accountsmanager
 
 DS_DBUS_SERVICE = 'org.laptop.sugar.DataStore'
 DS_DBUS_INTERFACE = 'org.laptop.sugar.DataStore'
@@ -546,6 +547,11 @@ def find(query_, page_size):
 
     if mount_points[0] == '/':
         return DatastoreResultSet(query, page_size)
+    elif mount_points[0].startswith('WS'):
+        for account in accountsmanager.get_configured_accounts():
+            if hasattr(account, 'get_store') and \
+                   mount_points[0] == account.get_mount_point():
+                return account.get_store().find(query, page_size)
     else:
         return InplaceResultSet(query, page_size, mount_points[0])
 
@@ -563,7 +569,13 @@ def _get_mount_point(path):
 def get(object_id):
     """Returns the metadata for an object
     """
-    if os.path.exists(object_id):
+    if object_id.startswith('WS'):
+        for account in accountsmanager.get_configured_accounts():
+            if hasattr(account, 'get_store') and \
+                   object_id.startswith(account.get_mount_point()):
+                metadata = account.get_store().get_metadata(object_id)
+                break
+    elif os.path.exists(object_id):
         stat = os.stat(object_id)
         metadata = _get_file_metadata(object_id, stat)
         metadata['mountpoint'] = _get_mount_point(object_id)
@@ -576,6 +588,11 @@ def get(object_id):
 def get_file(object_id):
     """Returns the file for an object
     """
+    if object_id.startswith('WS'):
+        for account in accountsmanager.get_configured_accounts():
+            if hasattr(account, 'get_store') and \
+                   object_id.startswith(account.get_mount_point()):
+                return account.get_store().get_file(object_id)
     if os.path.exists(object_id):
         logging.debug('get_file asked for file with path %r', object_id)
         return object_id
@@ -613,8 +630,15 @@ def get_unique_values(key):
 
 def delete(object_id):
     """Removes an object from persistent storage
-    """
-    if not os.path.exists(object_id):
+    """   
+    if object_id.startswith('WS'):
+        for account in accountsmanager.get_configured_accounts():
+            if hasattr(account, 'get_store') and \
+                   object_id.startswith(account.get_mount_point()):
+                account.get_store().delete(object_id)
+                deleted.send(None, object_id=object_id)
+                break
+    elif not os.path.exists(object_id):
         _get_datastore().delete(object_id)
     else:
         os.unlink(object_id)
@@ -660,7 +684,8 @@ def write(metadata, file_path='', update_mtime=True, transfer_ownership=True):
         metadata['mtime'] = datetime.now().isoformat()
         metadata['timestamp'] = int(time.time())
 
-    if metadata.get('mountpoint', '/') == '/':
+    mount_point = metadata.get('mountpoint', '/')
+    if mount_point == '/':
         if metadata.get('uid', ''):
             object_id = _get_datastore().update(metadata['uid'],
                                                 dbus.Dictionary(metadata),
@@ -670,6 +695,12 @@ def write(metadata, file_path='', update_mtime=True, transfer_ownership=True):
             object_id = _get_datastore().create(dbus.Dictionary(metadata),
                                                 file_path,
                                                 transfer_ownership)
+    elif mount_point.startswith('WS'): 
+        for account in accountsmanager.get_configured_accounts():
+            if hasattr(account, 'get_store') and \
+                   mount_point == account.get_mount_point():
+                object_id = account.get_store().write(metadata, file_path)
+                break
     else:
         object_id = _write_entry_on_external_device(metadata, file_path)
 
