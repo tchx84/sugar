@@ -37,6 +37,7 @@ from sugar3 import env
 from sugar3 import profile
 
 from jarabe.journal import model
+from jarabe.webservice import accountsmanager
 from jarabe.journal.misc import get_mount_icon_name
 from jarabe.view.palettes import VolumePalette
 
@@ -193,6 +194,7 @@ class VolumesToolbar(Gtk.Toolbar):
 
     def _set_up_volumes(self):
         self._set_up_documents_button()
+        self._set_up_extensions_buttons()
 
         volume_monitor = Gio.VolumeMonitor.get()
         self._mount_added_hid = volume_monitor.connect('mount-added',
@@ -203,6 +205,20 @@ class VolumesToolbar(Gtk.Toolbar):
 
         for mount in volume_monitor.get_mounts():
             self._add_button(mount)
+
+    def _set_up_extensions_buttons(self):
+        logging.debug('setting up FakeStore button')
+        for account in accountsmanager.get_configured_accounts():
+            if hasattr(account, 'get_store'):
+                button = account.get_store().get_button()
+                button.props.group = self._volume_buttons[0]
+                button.connect('toggled', self._button_toggled_cb)
+                button.show()
+
+                position = self.get_item_index(self._volume_buttons[-1]) + 1
+                self.insert(button, position)
+                self._volume_buttons.append(button)
+                self.show()
 
     def _set_up_documents_button(self):
         documents_path = model.get_documents_path()
