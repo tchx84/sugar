@@ -203,12 +203,15 @@ class StringSettingBox(SettingBox):
     """
     A configuration line for a string setting.
     """
-    def __init__(self, name, setting, setting_key, size_group=None):
+    def __init__(self, name, setting, setting_key, size_group=None,
+                 password_field=False):
         SettingBox.__init__(self, name, size_group)
 
         self._entry = Gtk.Entry()
         self.pack_start(self._entry, True, True, 0)
         self._entry.show()
+        if password_field:
+            self._entry.set_visibility(False)
 
         setting.bind(setting_key, self._entry, 'text',
                      Gio.SettingsBindFlags.NO_SENSITIVITY)
@@ -677,7 +680,7 @@ class Network(SectionView):
         self.box_password = StringSettingBox(
             _('Password:'),
             self._proxy_settings['org.gnome.system.proxy.http'],
-            'authentication-password', size_group)
+            'authentication-password', size_group, password_field=True)
 
         auth_contents_box.pack_start(self.box_password, False, False, 0)
         self.box_password.show()
