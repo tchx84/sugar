@@ -14,14 +14,70 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+import logging
+from gettext import gettext as _
+
 from gi.repository import GObject
 from gi.repository import Gtk
 from gi.repository import Gdk
 
 from sugar3.graphics import style
 from sugar3.graphics.xocolor import XoColor
+from sugar3.graphics.palettemenu import PaletteMenuBox
+from sugar3.graphics.palettemenu import PaletteMenuItem
+from sugar3.graphics.palettemenu import PaletteMenuItemSeparator
 
+from jarabe.model import notifications
 from jarabe.view.pulsingicon import PulsingIcon
+
+
+class NotificationBox(Gtk.VBox):
+
+    def __init__(self, name):
+        Gtk.VBox.__init__(self)
+        self._name = name
+
+        upper_separator = PaletteMenuItemSeparator()
+        lower_separator = PaletteMenuItemSeparator()
+
+        clear_item = PaletteMenuItem(_('Clear notifications'), 'dialog-cancel')
+        clear_item.connect('activate', self.__clear_cb)
+
+        options_menu = PaletteMenuBox()
+        options_menu.append_item(upper_separator)
+        options_menu.append_item(clear_item)
+        options_menu.append_item(lower_separator)
+
+        # TODO use Gtk.ScrolledWindow to handle expansion
+        self._notifications_menu = PaletteMenuBox()
+
+        self.add(options_menu)
+        self.add(self._notifications_menu)
+
+        self._service = notifications.get_service()
+        for entry in self._service.retrieve_by_name(self._name):
+            self._add(entry['summary'], entry['body'])
+        self._service.notification_received.connect(
+            self.__notification_received_cb)
+
+    def _add(self, summary, body):
+        # TODO the size of Items does not look right
+        item = PaletteMenuItem('', 'emblem-notification')
+        item.set_label('<b>%s</b>\n%s' % (summary, body))
+        self._notifications_menu.append_item(item)
+        self.show()
+
+    def __clear_cb(self, clear_item):
+        logging.debug('NotificationBox.__clear_cb')
+        for item in self._notifications_menu.get_children():
+            self._notifications_menu.remove(item)
+        self._service.clear_by_name(self._name)
+        self.hide()
+
+    def __notification_received_cb(self, **kwargs):
+        logging.debug('NotificationBox.__notification_received_cb')
+        if kwargs.get('app_name', '') == self._name:
+            self._add(kwargs.get('summary', ''), kwargs.get('body', ''))
 
 
 class NotificationIcon(Gtk.EventBox):
