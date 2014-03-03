@@ -20,10 +20,12 @@ from gettext import gettext as _
 from gi.repository import GObject
 from gi.repository import Gtk
 from gi.repository import Gdk
+from gi.repository import Pango
 
 from sugar3 import profile
 from sugar3.graphics import style
 from sugar3.graphics.xocolor import XoColor
+from sugar3.graphics.icon import Icon
 from sugar3.graphics.icon import get_surface
 from sugar3.graphics.palette import Palette
 from sugar3.graphics.palettemenu import PaletteMenuBox
@@ -37,6 +39,8 @@ from jarabe.frame.frameinvoker import FrameWidgetInvoker
 
 
 class NotificationBox(Gtk.VBox):
+
+    MAX_WIDTH = 70
 
     def __init__(self, name):
         Gtk.VBox.__init__(self)
@@ -54,7 +58,7 @@ class NotificationBox(Gtk.VBox):
         options_menu.append_item(lower_separator)
 
         # TODO use Gtk.ScrolledWindow to handle expansion
-        self._notifications_menu = PaletteMenuBox()
+        self._notifications_menu = Gtk.VBox()
 
         self.add(options_menu)
         self.add(self._notifications_menu)
@@ -66,11 +70,42 @@ class NotificationBox(Gtk.VBox):
             self.__notification_received_cb)
 
     def _add(self, summary, body):
-        # TODO the size of Items does not look right
-        item = PaletteMenuItem('', 'emblem-notification')
-        item.set_label('<b>%s</b>\n%s' % (summary, body))
-        self._notifications_menu.append_item(item)
-        self.show()
+        icon = Icon()
+        icon.props.icon_name = 'emblem-notification'
+        icon.props.icon_size = Gtk.IconSize.SMALL_TOOLBAR
+        icon.show()
+
+        summary_label = Gtk.Label()
+        summary_label.set_max_width_chars(self.MAX_WIDTH)
+        summary_label.set_ellipsize(Pango.EllipsizeMode.END)
+        summary_label.set_alignment(0, 0.5)
+        summary_label.set_markup('<b>%s</b>' % summary)
+        summary_label.show()
+
+        body_label = Gtk.Label()
+        body_label.set_max_width_chars(self.MAX_WIDTH)
+        body_label.set_ellipsize(Pango.EllipsizeMode.END)
+        body_label.set_alignment(0, 0.5)
+        body_label.set_text(body)
+        body_label.show()
+
+        grid = Gtk.Grid()
+        grid.set_column_spacing(style.DEFAULT_SPACING)
+        grid. set_row_homogeneous(True)
+        grid.attach(icon, 0, 0, 1, 2)
+        grid.attach(summary_label, 1, 0, 1, 1)
+        grid.attach(body_label, 1, 1, 1, 1)
+        grid.show()
+
+        alignment = Gtk.Alignment()
+        alignment.set_padding(0,
+                              style.DEFAULT_SPACING,
+                              style.DEFAULT_SPACING,
+                              style.DEFAULT_SPACING)
+        alignment.add(grid)
+        alignment.show()
+
+        self._notifications_menu.add(alignment)
 
     def __clear_cb(self, clear_item):
         logging.debug('NotificationBox.__clear_cb')
