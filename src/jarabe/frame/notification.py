@@ -147,8 +147,7 @@ class NotificationButton(ToolButton):
         notification_box.show_all()
         palette = Palette(self._name)
         palette.set_group_id('frame')
-        # TODO find a cleaner way to include it
-        palette._secondary_box.add(notification_box)
+        palette.set_content(notification_box)
         self.set_palette(palette)
 
 
