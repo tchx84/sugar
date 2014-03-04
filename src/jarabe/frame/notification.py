@@ -83,6 +83,9 @@ class NotificationBox(Gtk.VBox):
         icon = Icon()
         icon.props.icon_name = 'emblem-notification'
         icon.props.icon_size = Gtk.IconSize.SMALL_TOOLBAR
+        icon.props.xo_color = \
+            XoColor('%s,%s' % (style.COLOR_WHITE.get_svg(),
+                               style.COLOR_BLACK.get_svg()))
         icon.show()
 
         summary_label = Gtk.Label()
