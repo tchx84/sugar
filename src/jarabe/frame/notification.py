@@ -134,6 +134,7 @@ class NotificationButton(ToolButton):
         self._icon = None
         self.set_palette_invoker(FrameWidgetInvoker(self))
         self.palette_invoker.cache_palette = False
+        self.connect('clicked', self.__clicked_cb)
 
     def set_icon(self, icon):
         self._icon = icon
@@ -154,6 +155,10 @@ class NotificationButton(ToolButton):
         palette.set_group_id('frame')
         palette.set_content(notification_box)
         self.set_palette(palette)
+
+    def __clicked_cb(self, button):
+        self.create_palette()
+        self.palette.popup(immediate=True, state=Palette.SECONDARY) 
 
 
 class NotificationPulsingIcon(PulsingIcon):
