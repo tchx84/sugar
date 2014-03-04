@@ -40,21 +40,30 @@ from jarabe.frame.frameinvoker import FrameWidgetInvoker
 
 class NotificationBox(Gtk.VBox):
 
+    MAX_ITEMS = 5
     MAX_WIDTH = 70
 
     def __init__(self, name):
         Gtk.VBox.__init__(self)
         self._name = name
 
+        self._notifications_menu = Gtk.VBox()
+        self._notifications_menu.show()
+
+        self._scrolled_window = Gtk.ScrolledWindow()
+        self._scrolled_window.add(self._notifications_menu)
+        self._scrolled_window.set_policy(Gtk.PolicyType.NEVER,
+                                         Gtk.PolicyType.AUTOMATIC)
+        self._scrolled_window.show()
+
         separator = PaletteMenuItemSeparator()
+        separator.show()
 
         clear_item = PaletteMenuItem(_('Clear notifications'), 'dialog-cancel')
         clear_item.connect('activate', self.__clear_cb)
+        clear_item.show()
 
-        # TODO use Gtk.ScrolledWindow to handle expansion
-        self._notifications_menu = Gtk.VBox()
-
-        self.add(self._notifications_menu)
+        self.add(self._scrolled_window)
         self.add(separator)
         self.add(clear_item)
 
@@ -63,6 +72,12 @@ class NotificationBox(Gtk.VBox):
             self._add(entry['summary'], entry['body'])
         self._service.notification_received.connect(
             self.__notification_received_cb)
+
+    def _update_scrolled_size(self):
+        entries = self._notifications_menu.get_children()
+        req1, req2 = entries[0].get_preferred_size()
+        height = min(self.MAX_ITEMS, len(entries)) * req2.height
+        self._scrolled_window.set_size_request(-1, height)
 
     def _add(self, summary, body):
         icon = Icon()
@@ -85,22 +100,17 @@ class NotificationBox(Gtk.VBox):
         body_label.show()
 
         grid = Gtk.Grid()
+        grid.set_border_width(style.DEFAULT_SPACING) 
         grid.set_column_spacing(style.DEFAULT_SPACING)
+        grid.set_row_spacing(0)
         grid. set_row_homogeneous(True)
         grid.attach(icon, 0, 0, 1, 2)
         grid.attach(summary_label, 1, 0, 1, 1)
         grid.attach(body_label, 1, 1, 1, 1)
         grid.show()
 
-        alignment = Gtk.Alignment()
-        alignment.set_padding(0,
-                              style.DEFAULT_SPACING,
-                              style.DEFAULT_SPACING,
-                              style.DEFAULT_SPACING)
-        alignment.add(grid)
-        alignment.show()
-
-        self._notifications_menu.add(alignment)
+        self._notifications_menu.add(grid)
+        self._update_scrolled_size()
 
     def __clear_cb(self, clear_item):
         logging.debug('NotificationBox.__clear_cb')
