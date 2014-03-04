@@ -111,6 +111,7 @@ class NotificationBox(Gtk.VBox):
 
         self._notifications_menu.add(grid)
         self._update_scrolled_size()
+        self.show()
 
     def __clear_cb(self, clear_item):
         logging.debug('NotificationBox.__clear_cb')
@@ -149,7 +150,6 @@ class NotificationButton(ToolButton):
 
     def create_palette(self):
         notification_box = NotificationBox(self._name)
-        notification_box.show_all()
         palette = Palette(self._name)
         palette.set_group_id('frame')
         palette.set_content(notification_box)
