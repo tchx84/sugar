@@ -166,6 +166,9 @@ class NotificationButton(ToolButton):
 
 class NotificationPulsingIcon(PulsingIcon):
 
+    SIZE = 19
+    POSITION = 22
+
     def __init__(self, filename=None, name=None, colors=None):
         PulsingIcon.__init__(self)
         self._badge = None
@@ -186,7 +189,9 @@ class NotificationPulsingIcon(PulsingIcon):
 
     def show_badge(self):
         self._badge = get_surface(icon_name='emblem-notification',
-                                  width=22, height=22)
+                                  stroke_color=style.COLOR_WHITE.get_svg(),
+                                  fill_color=style.COLOR_BLACK.get_svg(),
+                                  width=self.SIZE, height=self.SIZE) 
 
     def hide_badge(self):
         self._badge = None
@@ -194,7 +199,7 @@ class NotificationPulsingIcon(PulsingIcon):
     def do_draw(self, cr):
         PulsingIcon.do_draw(self, cr)
         if self._badge:
-            cr.set_source_surface(self._badge, 22, 22)
+            cr.set_source_surface(self._badge, self.POSITION, self.POSITION)
             cr.paint()
 
 
