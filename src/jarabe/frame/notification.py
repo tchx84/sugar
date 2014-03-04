@@ -46,22 +46,17 @@ class NotificationBox(Gtk.VBox):
         Gtk.VBox.__init__(self)
         self._name = name
 
-        upper_separator = PaletteMenuItemSeparator()
-        lower_separator = PaletteMenuItemSeparator()
+        separator = PaletteMenuItemSeparator()
 
         clear_item = PaletteMenuItem(_('Clear notifications'), 'dialog-cancel')
         clear_item.connect('activate', self.__clear_cb)
 
-        options_menu = PaletteMenuBox()
-        options_menu.append_item(upper_separator)
-        options_menu.append_item(clear_item)
-        options_menu.append_item(lower_separator)
-
         # TODO use Gtk.ScrolledWindow to handle expansion
         self._notifications_menu = Gtk.VBox()
 
-        self.add(options_menu)
         self.add(self._notifications_menu)
+        self.add(separator)
+        self.add(clear_item)
 
         self._service = notifications.get_service()
         for entry in self._service.retrieve_by_name(self._name):
