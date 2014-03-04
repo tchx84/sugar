@@ -28,7 +28,6 @@ from sugar3.graphics.xocolor import XoColor
 from sugar3.graphics.icon import Icon
 from sugar3.graphics.icon import get_surface
 from sugar3.graphics.palette import Palette
-from sugar3.graphics.palettemenu import PaletteMenuBox
 from sugar3.graphics.palettemenu import PaletteMenuItem
 from sugar3.graphics.palettemenu import PaletteMenuItemSeparator
 from sugar3.graphics.toolbutton import ToolButton
