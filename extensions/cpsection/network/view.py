@@ -26,6 +26,7 @@ from sugar3.graphics import style
 from jarabe.controlpanel.sectionview import SectionView
 from jarabe.controlpanel.inlinealert import InlineAlert
 
+from model import HiddenNetworkManager
 
 CLASS = 'Network'
 ICON = 'module-network'
@@ -307,15 +308,48 @@ class Network(SectionView):
         workspace.pack_start(box_mesh, False, True, 0)
         box_mesh.show()
 
-        separator_proxy = Gtk.HSeparator()
-        workspace.pack_start(separator_proxy, False, False, 0)
-        separator_proxy.show()
+        self._hidden_conn_manager = HiddenNetworkManager()
+        if self._hidden_conn_manager.enabled:
+            self._add_hidden_ssid_section(workspace)
 
         self._add_proxy_section(workspace)
 
         self.setup()
 
+    def _add_hidden_ssid_section(self, workspace):
+        separator_hidden_network = Gtk.HSeparator()
+        workspace.pack_start(separator_hidden_network, False, False, 0)
+        separator_hidden_network.show()
+
+        label_hidden_network = Gtk.Label(_('Hidden Networks'))
+        label_hidden_network.set_alignment(0, 0)
+        workspace.pack_start(label_hidden_network, False, False, 0)
+        label_hidden_network.show()
+        box_hidden_network = Gtk.VBox()
+        box_hidden_network.set_border_width(style.DEFAULT_SPACING * 2)
+        box_hidden_network.set_spacing(style.DEFAULT_SPACING)
+
+        info = Gtk.Label(_("Enter the name of the hidden network"))
+        info.set_alignment(0, 0)
+        info.set_line_wrap(True)
+        box_hidden_network.pack_start(info, False, False, 0)
+        info.show()
+
+        self._hidden_network_name_entry = Gtk.Entry()
+        self._hidden_network_name_entry.set_text(
+            self._hidden_conn_manager.get_hidden_ssid())
+        box_hidden_network.pack_start(self._hidden_network_name_entry, False,
+                                      False, 0)
+        self._hidden_network_name_entry.show()
+
+        workspace.pack_start(box_hidden_network, False, False, 0)
+        box_hidden_network.show()
+
     def _add_proxy_section(self, workspace):
+        separator_hidden_network = Gtk.HSeparator()
+        workspace.pack_start(separator_hidden_network, False, False, 0)
+        separator_hidden_network.show()
+
         label_proxy = Gtk.Label(_('Proxy'))
         label_proxy.set_alignment(0, 0)
         workspace.pack_start(label_proxy, False, True, 0)
@@ -469,6 +503,10 @@ class Network(SectionView):
     def apply(self):
         for setting in self._proxy_settings.values():
             setting.apply()
+
+        if self._hidden_conn_manager.enabled:
+            self._hidden_conn_manager.set_hidden_ssid(
+                self._hidden_network_name_entry.get_text())
 
     def _validate(self):
         if self._jabber_valid and self._radio_valid:

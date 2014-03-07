@@ -18,6 +18,8 @@
 import logging
 
 import dbus
+import uuid
+
 from gettext import gettext as _
 from gi.repository import GConf
 
@@ -154,3 +156,86 @@ def set_publish_information(value):
     client = GConf.Client.get_default()
     client.set_bool('/desktop/sugar/collaboration/publish_gadget', value)
     return 0
+
+
+class HiddenNetworkManager():
+
+    def __init__(self):
+        client = GConf.Client.get_default()
+        self.enabled = client.get_bool(
+            '/desktop/sugar/extensions/network/conf_hidden_ssid')
+        if not self.enabled:
+            return
+        try:
+            self._bus = dbus.SystemBus()
+            self._netmgr = network.get_manager()
+        except dbus.DBusException:
+            logging.debug('NetworkManager not available')
+            return
+
+        self._netmgr.GetDevices(reply_handler=self.__get_devices_reply_cb,
+                                error_handler=self.__get_devices_error_cb)
+
+    def __get_devices_reply_cb(self, devices_o):
+        for dev_o in devices_o:
+            self._check_device(dev_o)
+
+    def __get_devices_error_cb(self, err):
+        logging.error('Failed to get devices: %s', err)
+
+    def _check_device(self, device_o):
+        device = self._bus.get_object(network.NM_SERVICE, device_o)
+        props = dbus.Interface(device, dbus.PROPERTIES_IFACE)
+
+        device_type = props.Get(network.NM_DEVICE_IFACE, 'DeviceType')
+        if device_type == network.NM_DEVICE_TYPE_WIFI:
+            state = props.Get(network.NM_DEVICE_IFACE, 'State')
+            if state == 100:  # Activated
+                self._active_device = device_o
+
+    def _get_device_path_error_cb(self, err):
+        logging.error('Failed to get device type: %s', err)
+
+    def create_and_connect_by_ssid(self, ssid):
+        connection = network.find_connection_by_ssid(ssid)
+        if connection is None:
+            # Th connection do not exists
+            settings = network.Settings()
+            settings.connection.id = ssid
+            settings.connection.type = \
+                network.NM_CONNECTION_TYPE_802_11_WIRELESS
+            settings.connection.uuid = str(uuid.uuid4())
+
+            settings.wireless.ssid = dbus.ByteArray(ssid)
+            settings.wireless.hidden = True
+
+            self._netmgr.AddAndActivateConnection(
+                settings.get_dict(),
+                self._active_device, '/',
+                reply_handler=self._add_connection_reply_cb,
+                error_handler=self._add_connection_error_cb)
+        else:
+            self._netmgr.ActivateConnection(
+                connection.get_path(),
+                self._active_device, '/')
+
+    def _add_connection_reply_cb(self, netmgr, connection):
+        logging.debug('Added connection: %s', connection)
+
+    def _add_connection_error_cb(self, netmgr, err):
+        logging.error('Failed to add connection: %s', err)
+
+    def get_hidden_ssid(self):
+        client = GConf.Client.get_default()
+        ssid = client.get_string(
+            '/desktop/sugar/extensions/network/hidden_network_name')
+        if ssid is None:
+            ssid = ''
+        return ssid
+
+    def set_hidden_ssid(self, ssid):
+        client = GConf.Client.get_default()
+        client.set_string(
+            '/desktop/sugar/extensions/network/hidden_network_name', ssid)
+        if ssid != '':
+            self.create_and_connect_by_ssid(ssid)

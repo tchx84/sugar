@@ -403,6 +403,7 @@ class Wireless(object):
         self.mode = None
         self.band = None
         self.channel = None
+        self.hidden = False
 
     def get_dict(self):
         wireless = {'ssid': self.ssid}
@@ -414,6 +415,7 @@ class Wireless(object):
             wireless['band'] = self.band
         if self.channel:
             wireless['channel'] = self.channel
+        wireless['hidden'] = self.hidden
         return wireless
 
 
