@@ -27,7 +27,7 @@ from sugar3.graphics import style
 from jarabe.controlpanel.sectionview import SectionView
 from jarabe.controlpanel.inlinealert import InlineAlert
 
-from model import HiddenNetworkManager
+from jarabe.model.network import HiddenNetworkManager
 
 CLASS = 'Network'
 ICON = 'module-network'
