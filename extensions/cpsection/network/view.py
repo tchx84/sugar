@@ -389,12 +389,23 @@ class Network(SectionView):
 
         size_group = Gtk.SizeGroup(Gtk.SizeGroupMode.HORIZONTAL)
 
-        if len(self._hidden_conn_manager.network_profiles) > 0:
+        hidden_network_name_box = Gtk.VBox()
+        option_sets = [('No security', '', hidden_network_name_box, None)]
+        self._entries_properties = {}
+        name_box = SettingBox(_("Name"), size_group)
+        name_box.show()
+        self._hidden_network_name_entry = Gtk.Entry()
+        name_box.pack_start(self._hidden_network_name_entry, False, False, 0)
+        self._hidden_network_name_entry.show()
+        hidden_network_name_box.pack_start(name_box, False, False, 0)
+        self._entries_properties[self._hidden_network_name_entry] = \
+            '802-11-wireless.ssid'
 
-            option_sets = [('No security', '', Gtk.VBox(), None)]
+        if len(self._hidden_conn_manager.network_profiles) > 0:
 
             # load the network profiles in the option_sets
             network_profiles_index = {}
+            # map to relate the entry to the property to edit
             for network_profile in self._hidden_conn_manager.network_profiles:
                 box = Gtk.VBox()
 
@@ -434,6 +445,7 @@ class Network(SectionView):
                                 entry = Gtk.Entry()
                                 setting_box.pack_start(entry, True, True, 0)
                                 box.pack_start(setting_box, True, True, 0)
+                                self._entries_properties[entry] = key
                     count = count + 1
                 box.show_all()
 
@@ -442,26 +454,29 @@ class Network(SectionView):
                 index = len(option_sets) - 1
                 network_profiles_index[network_profile['title']] = index
 
-            box_mode = ComboSettingBox(_('Mode:'), option_sets, size_group)
-            box_mode.connect('changed', self._select_hidden_network_profile)
+        box_mode = ComboSettingBox(_('Mode:'), option_sets, size_group)
+        box_mode.combo_box.set_active(0)
 
-            box_hidden_network.pack_start(box_mode, False, False, 0)
-            box_mode.show()
-
-        name_box = SettingBox(_("Name"), size_group)
-        name_box.show()
-
-        self._hidden_network_name_entry = Gtk.Entry()
-        self._hidden_network_name_entry.set_text(
-            self._hidden_conn_manager.get_hidden_ssid())
-        name_box.pack_start(self._hidden_network_name_entry, False, False, 0)
-        self._hidden_network_name_entry.show()
-        box_hidden_network.pack_start(name_box, False, False, 0)
+        box_hidden_network.pack_start(box_mode, False, False, 0)
+        box_mode.show()
 
         self._hidden_network_params_box = Gtk.VBox()
         self._hidden_network_params_box.show()
         box_hidden_network.pack_start(self._hidden_network_params_box, False,
                                       False, 0)
+
+        # _select_hidden_network_profile need the box already created
+        box_mode.connect('changed', self._select_hidden_network_profile)
+
+        # show the widgets for the default mode
+        self._select_hidden_network_profile(box_mode)
+
+        btn_box = Gtk.HBox()
+        create_connection_btn = Gtk.Button('Connect to network')
+        create_connection_btn.connect('clicked', self.__connect_hidden_net_cb)
+        btn_box.pack_start(create_connection_btn, False, False, 0)
+        box_hidden_network.pack_start(btn_box, False, False, 0)
+        btn_box.show_all()
 
         workspace.pack_start(box_hidden_network, False, False, 0)
         box_hidden_network.show()
@@ -475,8 +490,30 @@ class Network(SectionView):
 
         self._hidden_network_params_box.add(new_box)
         new_box.show()
-        # TODO: apply profile
-        #profile = combo_setting_box.combo_box.get_model().get(giter, 3)[0]
+        self._hidden_conn_manager.selected_profile = \
+            combo_setting_box.combo_box.get_model().get(giter, 3)[0]
+
+    def __connect_hidden_net_cb(self, button):
+
+        profile = self._hidden_conn_manager.selected_profile
+        if profile is None:
+            if self._hidden_network_name_entry.get_text() != '':
+                self._hidden_conn_manager.create_and_connect_by_ssid(
+                    self._hidden_network_name_entry.get_text())
+        else:
+
+            # get the values from all the entries
+            current_box = self._hidden_network_params_box.get_children()[0]
+            for child in current_box.get_children():
+                # child is the SettingBox
+                entry = child.get_children()[1]
+                property_name = self._entries_properties[entry]
+                logging.error('property %s value %s', property_name,
+                              entry.get_text())
+                profile[property_name] = entry.get_text()
+            logging.error('profile %s',
+                          self._hidden_conn_manager.selected_profile)
+            self._hidden_conn_manager.create_and_connect_by_profile()
 
     def _add_proxy_section(self, workspace):
         separator_hidden_network = Gtk.HSeparator()
@@ -754,10 +791,6 @@ class Network(SectionView):
         for setting in self._proxy_settings.values():
             setting.apply()
         self._model.set_proxy_profile_name(self._proxy_profile_name)
-
-        if self._hidden_conn_manager.enabled:
-            self._hidden_conn_manager.set_hidden_ssid(
-                self._hidden_network_name_entry.get_text())
 
     def _validate(self):
         if self._jabber_valid and self._radio_valid:

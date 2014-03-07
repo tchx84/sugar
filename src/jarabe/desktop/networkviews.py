@@ -510,7 +510,17 @@ class WirelessNetworkView(EventPulsingIcon):
                 else:
                     logging.debug('Not setting empty value for key :%s', key)
 
-            settings.wpa_eap_setting = key_value_dict
+            eap_security = network.EapSecurity()
+            if 'eap' in key_value_dict:
+                eap_security.eap = key_value_dict['eap']
+            if 'identity' in key_value_dict:
+                eap_security.identity = key_value_dict['identity']
+            if 'password' in key_value_dict:
+                eap_security.password = key_value_dict['password']
+            if 'phase2-auth' in key_value_dict:
+                eap_security.phase2_auth = key_value_dict['phase2-auth']
+
+            settings.wpa_eap_setting = eap_security
 
         network.add_and_activate_connection(self._device, settings,
                                             self.get_first_ap().model)

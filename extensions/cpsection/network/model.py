@@ -207,6 +207,8 @@ def get_proxy_profile_name():
 
 
 def set_proxy_profile_name(profile_name):
+    if profile_name is None:
+        profile_name = ''
     client = GConf.Client.get_default()
     client.set_string('/desktop/sugar/network/proxy/profile_name',
                       profile_name)
@@ -226,6 +228,7 @@ class HiddenNetworkManager():
         self.enabled = client.get_bool(
             '/desktop/sugar/extensions/network/conf_hidden_ssid')
         if not self.enabled:
+            logging.debug('Hidden network configuration disabled')
             return
         try:
             self._bus = dbus.SystemBus()
@@ -239,13 +242,16 @@ class HiddenNetworkManager():
 
         # get the list of connectivity profiles of type "connectivity"
         self.network_profiles = []
-        logging.error('profiles %s', conn_profiles)
+        logging.debug('profiles %s', conn_profiles)
         for profile_key in conn_profiles:
             profile = conn_profiles[profile_key]
             if profile['type'] == 'connectivity':
                 self.network_profiles.append(profile)
+        self.selected_profile = None
 
     def __get_devices_reply_cb(self, devices_o):
+        logging.debug('__get_devices_reply_cb len(devices) = %d',
+                      len(devices_o))
         for dev_o in devices_o:
             self._check_device(dev_o)
 
@@ -274,9 +280,79 @@ class HiddenNetworkManager():
             settings.connection.type = \
                 network.NM_CONNECTION_TYPE_802_11_WIRELESS
             settings.connection.uuid = str(uuid.uuid4())
+            settings.connection.autoconnect = True
 
             settings.wireless.ssid = dbus.ByteArray(ssid)
             settings.wireless.hidden = True
+            logging.debug('AddAndActivateConnection')
+            self._netmgr.AddAndActivateConnection(
+                settings.get_dict(),
+                self._active_device, '/',
+                reply_handler=self._add_connection_reply_cb,
+                error_handler=self._add_connection_error_cb)
+        else:
+            logging.debug('ActivateConnection')
+            self._netmgr.ActivateConnection(
+                connection.get_path(),
+                self._active_device, '/')
+
+    def create_and_connect_by_profile(self):
+        """
+        A profile is a dictionary with a format like this
+        profile {'title': 'Queensland', 'type': 'connectivity',
+            'connection.id': 'QDETA-X',
+            'connection.type': '802-11-wireless',
+            '802-1x.eap': 'peap',
+            '802-1x.identity': 'uuuuu',
+            '802-1x.password': 'pppppp',
+            '802-1x.phase2-auth': 'mschapv2',
+            '802-11-wireless.security': '802-11-wireless-security',
+            '802-11-wireless.ssid': 'QDETA-X',
+            '802-11-wireless-security.key-mgmt': 'wpa-eap',
+            'ipv4.method': 'auto',
+                }
+        """
+        if self.selected_profile is None:
+            logging.error('No profile selected')
+            return
+
+        profile = self.selected_profile
+        connection = network.find_connection_by_ssid(profile['connection.id'])
+        if connection is None:
+            # Th connection do not exists
+            settings = network.Settings()
+            settings.connection.id = profile['connection.id']
+            settings.connection.type = profile['connection.type']
+            settings.connection.uuid = str(uuid.uuid4())
+            settings.connection.autoconnect = True
+
+            settings.wireless.ssid = dbus.ByteArray(
+                profile['802-11-wireless.ssid'])
+            settings.wireless.hidden = True
+
+            if '802-11-wireless.security' in profile and \
+                    profile['802-11-wireless.security'].upper() not in \
+                    ('', 'NONE'):
+                settings.wireless_security = network.WirelessSecurity()
+                settings.wireless_security.key_mgmt = \
+                    profile['802-11-wireless-security.key-mgmt']
+
+                if settings.wireless_security.key_mgmt == 'wpa-eap':
+                    settings.wpa_eap_setting = network.EapSecurity()
+                    settings.wpa_eap_setting.eap = profile['802-1x.eap']
+                    settings.wpa_eap_setting.identity = profile[
+                        '802-1x.identity']
+                    settings.wpa_eap_setting.password = profile[
+                        '802-1x.password']
+                    settings.wpa_eap_setting.phase2_auth = profile[
+                        '802-1x.phase2-auth']
+
+            if 'ipv4.method' in profile and \
+                    profile['ipv4.method'].upper() not in ('', 'NONE'):
+                settings.ip4_config = network.IP4Config()
+                settings.ip4_config.method = profile['ipv4.method']
+
+            logging.error('createby_profile %s', settings.get_dict())
 
             self._netmgr.AddAndActivateConnection(
                 settings.get_dict(),
@@ -291,20 +367,5 @@ class HiddenNetworkManager():
     def _add_connection_reply_cb(self, netmgr, connection):
         logging.debug('Added connection: %s', connection)
 
-    def _add_connection_error_cb(self, netmgr, err):
+    def _add_connection_error_cb(self, err):
         logging.error('Failed to add connection: %s', err)
-
-    def get_hidden_ssid(self):
-        client = GConf.Client.get_default()
-        ssid = client.get_string(
-            '/desktop/sugar/extensions/network/hidden_network_name')
-        if ssid is None:
-            ssid = ''
-        return ssid
-
-    def set_hidden_ssid(self, ssid):
-        client = GConf.Client.get_default()
-        client.set_string(
-            '/desktop/sugar/extensions/network/hidden_network_name', ssid)
-        if ssid != '':
-            self.create_and_connect_by_ssid(ssid)
