@@ -614,14 +614,29 @@ class HiddenNetworkManager():
         self._netmgr.GetDevices(reply_handler=self.__get_devices_reply_cb,
                                 error_handler=self.__get_devices_error_cb)
 
+        # get the values previously saved
+        profile_name = client.get_string(
+            '/desktop/sugar/extensions/network/hidden_network_profile')
+        self.selected_ssid = client.get_string(
+            '/desktop/sugar/extensions/network/hidden_network_ssid')
+        logging.error('get profile name from gconf = %s', profile_name)
+        self.selected_profile = None
         # get the list of connectivity profiles of type "connectivity"
         self.network_profiles = []
-        logging.debug('profiles %s', conn_profiles)
+        self.stored_parameters = {}
+        logging.debug('all profiles %s', conn_profiles)
         for profile_key in conn_profiles:
             profile = conn_profiles[profile_key]
             if profile['type'] == 'connectivity':
+                self.stored_parameters[profile['title']] = \
+                    self.load_requested_parameters(profile['title'])
                 self.network_profiles.append(profile)
-        self.selected_profile = None
+                if profile_name:
+                    if profile_name == profile['title']:
+                        logging.error('SELECTED PROFILE FOUND = %s',
+                                      profile_name)
+                        self.selected_profile = profile
+        logging.error('stored_parameters = %s', self.stored_parameters)
 
     def __get_devices_reply_cb(self, devices_o):
         logging.debug('__get_devices_reply_cb len(devices) = %d',
@@ -649,6 +664,13 @@ class HiddenNetworkManager():
 
     def create_and_connect_by_ssid(self, ssid):
         logging.debug('create_and_connect_by_ssid ssid=%s', ssid)
+        # save in gconf
+        client = GConf.Client.get_default()
+        client.set_string(
+            '/desktop/sugar/extensions/network/hidden_network_profile', '')
+        client.set_string(
+            '/desktop/sugar/extensions/network/hidden_network_ssid', ssid)
+
         connection = find_connection_by_ssid(ssid)
         if connection is None:
             logging.error('connection is None')
@@ -693,6 +715,14 @@ class HiddenNetworkManager():
         if self.selected_profile is None:
             logging.error('No profile selected')
             return
+
+        # save in gconf
+        client = GConf.Client.get_default()
+        client.set_string(
+            '/desktop/sugar/extensions/network/hidden_network_profile',
+            self.selected_profile['title'])
+        client.set_string(
+            '/desktop/sugar/extensions/network/hidden_network_ssid', '')
 
         profile = self.selected_profile
         connection = find_connection_by_ssid(profile['connection.id'])
@@ -741,6 +771,27 @@ class HiddenNetworkManager():
             self._netmgr.ActivateConnection(
                 connection.get_path(),
                 self._active_device, '/')
+
+    def store_requested_parameters(self, requested_parameters):
+        client = GConf.Client.get_default()
+        profiles_path = '/desktop/sugar/extensions/network/profiles'
+        for parameter in requested_parameters:
+            logging.error('Storing in gconf %s = %s', parameter,
+                          self.selected_profile[parameter])
+            client.set_string('%s/%s/%s' %
+                              (profiles_path, self.selected_profile['title'],
+                               parameter), self.selected_profile[parameter])
+
+    def load_requested_parameters(self, profile_title):
+        requested_parameters = {}
+        client = GConf.Client.get_default()
+        entries = client.all_entries(
+            '/desktop/sugar/extensions/network/profiles/%s' % profile_title)
+        for entry in entries:
+            parameter = entry.key[entry.key.rfind('/') + 1:]
+            value = entry.value.to_string()
+            requested_parameters[parameter] = value
+        return requested_parameters
 
     def _add_connection_reply_cb(self, netmgr, connection):
         logging.debug('Added connection: %s', connection)
