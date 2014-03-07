@@ -19,6 +19,8 @@ import logging
 
 import dbus
 import uuid
+import os
+from ConfigParser import ConfigParser
 
 from gettext import gettext as _
 from gi.repository import GConf
@@ -156,6 +158,65 @@ def set_publish_information(value):
     client = GConf.Client.get_default()
     client.set_bool('/desktop/sugar/collaboration/publish_gadget', value)
     return 0
+
+
+def get_connectivity_profiles():
+    """
+    To simplify the use of complex proxy or connectivity configurations
+    the deployments can use a file to create template configurations.
+    """
+
+    connectivity_profiles = {}
+    profiles_path = '/etc/sugar_connection_profiles.ini'
+
+    if os.path.exists(profiles_path):
+        cp = ConfigParser()
+        cp.readfp(open(profiles_path))
+        for section in cp.sections():
+            # check mandatory fields
+            if not cp.has_option(section, 'type'):
+                logging.error(
+                    'Connectivity profile file %s section "%s",'
+                    ' do not have type',
+                    profiles_path, section)
+                break
+            if cp.get(section, 'type') not in ('proxy', 'connectivity'):
+                logging.error(
+                    'Connectivity profile file %s section "%s", type should'
+                    ' be "proxy" or "connectivity"', profiles_path, section)
+                break
+
+            if not cp.has_option(section, 'title'):
+                logging.error(
+                    'Connectivity profile file %s section "%s",'
+                    ' do not have title',
+                    profiles_path, section)
+                break
+
+            options = {}
+            for option in cp.options(section):
+                options[option] = cp.get(section, option)
+            connectivity_profiles[section] = options
+
+    return connectivity_profiles
+
+
+def get_proxy_profile_name():
+    client = GConf.Client.get_default()
+    return client.get_string('/desktop/sugar/network/proxy/profile_name')
+
+
+def set_proxy_profile_name(profile_name):
+    client = GConf.Client.get_default()
+    client.set_string('/desktop/sugar/network/proxy/profile_name',
+                      profile_name)
+
+
+def parameter_as_boolean(profile, parameter):
+    value = False
+    if parameter in profile:
+        value = profile[parameter].upper() in ('1', 'TRUE', 'YES')
+    return value
 
 
 class HiddenNetworkManager():

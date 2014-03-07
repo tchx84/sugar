@@ -14,6 +14,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 from gettext import gettext as _
+import logging
 
 from gi.repository import Gtk
 from gi.repository import Gdk
@@ -34,6 +35,8 @@ TITLE = _('Network')
 
 _APPLY_TIMEOUT = 3000
 
+DEFAULT_PROXY_PORT = 8080
+
 
 class SettingBox(Gtk.HBox):
     """
@@ -53,6 +56,11 @@ class SettingBox(Gtk.HBox):
 
 
 class ComboSettingBox(Gtk.VBox):
+
+    __gsignals__ = {
+        'profile-selected': (GObject.SignalFlags.RUN_FIRST, None, ([object])),
+    }
+
     """
     Container for sets of different settings selected by a top-level
     setting.
@@ -68,18 +76,18 @@ class ComboSettingBox(Gtk.VBox):
         self.pack_start(setting_box, False, False, 0)
         setting_box.show()
 
-        model = Gtk.ListStore(str, str, object)
-        combo_box = Gtk.ComboBox(model=model)
-        combo_box.connect('changed', self.__combo_changed_cb)
-        setting_box.pack_start(combo_box, True, True, 0)
-        combo_box.show()
+        model = Gtk.ListStore(str, str, object, object)
+        self._combo_box = Gtk.ComboBox(model=model)
+        self._combo_box.connect('changed', self.__combo_changed_cb)
+        setting_box.pack_start(self._combo_box, True, True, 0)
+        self._combo_box.show()
 
         cell_renderer = Gtk.CellRendererText()
         cell_renderer.props.ellipsize = Pango.EllipsizeMode.MIDDLE
         cell_renderer.props.ellipsize_set = True
-        combo_box.pack_start(cell_renderer, True)
-        combo_box.add_attribute(cell_renderer, 'text', 0)
-        combo_box.props.id_column = 1
+        self._combo_box.pack_start(cell_renderer, True)
+        self._combo_box.add_attribute(cell_renderer, 'text', 0)
+        self._combo_box.props.id_column = 1
 
         self._settings_box = Gtk.VBox()
         self._settings_box.show()
@@ -88,7 +96,7 @@ class ComboSettingBox(Gtk.VBox):
         for optset in option_sets:
             model.append(optset)
 
-        setting.bind(setting_key, combo_box, 'active-id',
+        setting.bind(setting_key, self._combo_box, 'active-id',
                      Gio.SettingsBindFlags.DEFAULT)
 
     def __combo_changed_cb(self, combobox):
@@ -101,6 +109,15 @@ class ComboSettingBox(Gtk.VBox):
         self._settings_box.add(new_box)
         new_box.show()
 
+        profile = combobox.get_model().get(giter, 3)[0]
+        self.emit('profile-selected', profile)
+
+    def set_active(self, active):
+        self._combo_box.set_active(active)
+        giter = self._combo_box.get_active_iter()
+        profile = self._combo_box.get_model().get(giter, 3)[0]
+        self.emit('profile-selected', profile)
+
 
 class OptionalSettingsBox(Gtk.VBox):
     """
@@ -112,18 +129,28 @@ class OptionalSettingsBox(Gtk.VBox):
     def __init__(self, name, setting, setting_key, contents_box):
         Gtk.VBox.__init__(self, spacing=style.DEFAULT_SPACING)
 
-        check_button = Gtk.CheckButton()
-        check_button.props.label = name
-        check_button.connect('toggled', self.__button_toggled_cb, contents_box)
-        check_button.show()
-        self.pack_start(check_button, True, True, 0)
+        self._check_button = Gtk.CheckButton()
+        self._check_button.props.label = name
+        self._check_button.connect('toggled', self.__button_toggled_cb,
+                                   contents_box)
+        self._check_button.show()
+        self.pack_start(self._check_button, True, True, 0)
         self.pack_start(contents_box, False, False, 0)
 
-        setting.bind(setting_key, check_button, 'active',
-                     Gio.SettingsBindFlags.DEFAULT)
+        setting.bind(setting_key, self._check_button, 'active',
+                     Gio.SettingsBindFlags.NO_SENSITIVITY)
 
     def __button_toggled_cb(self, check_button, contents_box):
         contents_box.set_visible(check_button.get_active())
+
+    def set_active(self, active):
+        self._check_button.set_active(active)
+
+    def set_checkbox_visible(self, visible):
+        if visible:
+            self._check_button.show()
+        else:
+            self._check_button.hide()
 
 
 class HostPortSettingBox(SettingBox):
@@ -133,20 +160,28 @@ class HostPortSettingBox(SettingBox):
     def __init__(self, name, setting, size_group=None):
         SettingBox.__init__(self, name, size_group)
 
-        host_entry = Gtk.Entry()
-        self.pack_start(host_entry, True, True, 0)
-        host_entry.show()
+        self._host_entry = Gtk.Entry()
+        self.pack_start(self._host_entry, True, True, 0)
+        self._host_entry.show()
 
-        setting.bind('host', host_entry, 'text', Gio.SettingsBindFlags.DEFAULT)
+        setting.bind('host', self._host_entry, 'text',
+                     Gio.SettingsBindFlags.NO_SENSITIVITY)
 
         # port number 0 means n/a
         adjustment = Gtk.Adjustment(0, 0, 65535, 1, 10)
-        port_spinbutton = Gtk.SpinButton(adjustment=adjustment, climb_rate=0.1)
-        self.pack_start(port_spinbutton, False, False, 0)
-        port_spinbutton.show()
+        self._port_spinbutton = Gtk.SpinButton(adjustment=adjustment,
+                                               climb_rate=0.1)
+        self.pack_start(self._port_spinbutton, False, False, 0)
+        self._port_spinbutton.show()
 
-        setting.bind('port', port_spinbutton, 'value',
-                     Gio.SettingsBindFlags.DEFAULT)
+        setting.bind('port', self._port_spinbutton, 'value',
+                     Gio.SettingsBindFlags.NO_SENSITIVITY)
+
+    def set_host(self, host):
+        self._host_entry.set_text(host)
+
+    def set_port(self, port):
+        self._port_spinbutton.set_value(port)
 
 
 class StringSettingBox(SettingBox):
@@ -156,11 +191,15 @@ class StringSettingBox(SettingBox):
     def __init__(self, name, setting, setting_key, size_group=None):
         SettingBox.__init__(self, name, size_group)
 
-        entry = Gtk.Entry()
-        self.pack_start(entry, True, True, 0)
-        entry.show()
+        self._entry = Gtk.Entry()
+        self.pack_start(self._entry, True, True, 0)
+        self._entry.show()
 
-        setting.bind(setting_key, entry, 'text', Gio.SettingsBindFlags.DEFAULT)
+        setting.bind(setting_key, self._entry, 'text',
+                     Gio.SettingsBindFlags.NO_SENSITIVITY)
+
+    def clear(self):
+        self._entry.set_text('')
 
 
 class Network(SectionView):
@@ -308,6 +347,9 @@ class Network(SectionView):
         workspace.pack_start(box_mesh, False, True, 0)
         box_mesh.show()
 
+        # read connectivity profiles if available
+        self._connectivity_profiles = self._model.get_connectivity_profiles()
+
         self._hidden_conn_manager = HiddenNetworkManager()
         if self._hidden_conn_manager.enabled:
             self._add_hidden_ssid_section(workspace)
@@ -384,24 +426,46 @@ class Network(SectionView):
         automatic_proxy_box = Gtk.VBox(spacing=style.DEFAULT_SPACING)
         manual_proxy_box = Gtk.VBox(spacing=style.DEFAULT_SPACING)
 
-        option_sets = [('None', 'none', Gtk.VBox()),
-                       ('Manual', 'manual', manual_proxy_box),
-                       ('Automatic', 'auto', automatic_proxy_box)]
+        option_sets = [('None', 'none', Gtk.VBox(), None),
+                       ('Manual', 'manual', manual_proxy_box, None),
+                       ('Automatic', 'auto', automatic_proxy_box, None)]
+
+        # get the list of connectivity profiles of type "proxy"
+        proxy_profiles = []
+        logging.error('profiles %s', self._connectivity_profiles)
+        for profile_key in self._connectivity_profiles:
+            profile = self._connectivity_profiles[profile_key]
+            if profile['type'] == 'proxy':
+                proxy_profiles.append(profile)
+
+        # load the proxy profiles in the option_sets
+        proxy_profiles_index = {}
+        for proxy_profile in proxy_profiles:
+            box = Gtk.VBox()
+            if proxy_profile['mode'] == 'manual':
+                box = manual_proxy_box
+            if proxy_profile['mode'] == 'auto':
+                box = automatic_proxy_box
+            option_sets.append((proxy_profile['title'], proxy_profile['mode'],
+                                box, proxy_profile))
+            index = len(option_sets) - 1
+            proxy_profiles_index[proxy_profile['title']] = index
 
         box_mode = ComboSettingBox(
             _('Method:'), self._proxy_settings['org.gnome.system.proxy'],
             'mode', option_sets, size_group)
+        box_mode.connect('profile-selected', self._apply_proxy_profile)
 
         box_proxy.pack_start(box_mode, False, False, 0)
         box_mode.show()
 
-        url_box = StringSettingBox(
+        self.url_box = StringSettingBox(
             _('Configuration URL:'),
             self._proxy_settings['org.gnome.system.proxy'], 'autoconfig-url',
             size_group)
 
-        automatic_proxy_box.pack_start(url_box, True, True, 0)
-        url_box.show()
+        automatic_proxy_box.pack_start(self.url_box, True, True, 0)
+        self.url_box.show()
 
         wpad_help_text = _('Web Proxy Autodiscovery is used when a'
                            ' Configuration URL is not provided. This is not'
@@ -412,63 +476,158 @@ class Network(SectionView):
         automatic_proxy_help.show()
         automatic_proxy_box.pack_start(automatic_proxy_help, True, True, 0)
 
-        box_http = HostPortSettingBox(
+        self.box_http = HostPortSettingBox(
             _('HTTP Proxy:'),
             self._proxy_settings['org.gnome.system.proxy.http'], size_group)
 
-        manual_proxy_box.pack_start(box_http, False, False, 0)
-        box_http.show()
+        manual_proxy_box.pack_start(self.box_http, False, False, 0)
+        self.box_http.show()
 
         auth_contents_box = Gtk.VBox(spacing=style.DEFAULT_SPACING)
 
-        auth_box = OptionalSettingsBox(
+        self.auth_box = OptionalSettingsBox(
             _('Use authentication'),
             self._proxy_settings['org.gnome.system.proxy.http'],
             'use-authentication', auth_contents_box)
 
-        manual_proxy_box.pack_start(auth_box, False, False, 0)
-        auth_box.show()
+        manual_proxy_box.pack_start(self.auth_box, False, False, 0)
+        self.auth_box.show()
 
         proxy_http_setting = Gio.Settings.new('org.gnome.system.proxy.http')
         proxy_http_setting.delay()
 
-        box_username = StringSettingBox(
+        self.box_username = StringSettingBox(
             _('Username:'),
             self._proxy_settings['org.gnome.system.proxy.http'],
             'authentication-user', size_group)
 
-        auth_contents_box.pack_start(box_username, False, False, 0)
-        box_username.show()
+        auth_contents_box.pack_start(self.box_username, False, False, 0)
+        self.box_username.show()
 
-        box_password = StringSettingBox(
+        self.box_password = StringSettingBox(
             _('Password:'),
             self._proxy_settings['org.gnome.system.proxy.http'],
             'authentication-password', size_group)
 
-        auth_contents_box.pack_start(box_password, False, False, 0)
-        box_password.show()
+        auth_contents_box.pack_start(self.box_password, False, False, 0)
+        self.box_password.show()
 
-        box_https = HostPortSettingBox(
+        self.box_https = HostPortSettingBox(
             _('HTTPS Proxy:'),
             self._proxy_settings['org.gnome.system.proxy.https'], size_group)
 
-        manual_proxy_box.pack_start(box_https, False, False, 0)
-        box_https.show()
+        manual_proxy_box.pack_start(self.box_https, False, False, 0)
+        self.box_https.show()
 
-        box_ftp = HostPortSettingBox(
+        self.box_ftp = HostPortSettingBox(
             _('FTP Proxy:'),
             self._proxy_settings['org.gnome.system.proxy.ftp'],
             size_group)
 
-        manual_proxy_box.pack_start(box_ftp, False, False, 0)
-        box_ftp.show()
+        manual_proxy_box.pack_start(self.box_ftp, False, False, 0)
+        self.box_ftp.show()
 
-        box_socks = HostPortSettingBox(
+        self.box_socks = HostPortSettingBox(
             _('SOCKS Proxy:'),
             self._proxy_settings['org.gnome.system.proxy.socks'], size_group)
 
-        manual_proxy_box.pack_start(box_socks, False, False, 0)
-        box_socks.show()
+        manual_proxy_box.pack_start(self.box_socks, False, False, 0)
+        self.box_socks.show()
+
+        # if a profile was selected update the combo value
+        self._proxy_profile_name = self._model.get_proxy_profile_name()
+        logging.error('Profile selected %s', self._proxy_profile_name)
+        if self._proxy_profile_name is not None and \
+                self._proxy_profile_name != '':
+            if self._proxy_profile_name in proxy_profiles_index:
+                index = proxy_profiles_index[self._proxy_profile_name]
+                logging.error('Profile selected index %s', index)
+                box_mode.set_active(index)
+
+    def _apply_proxy_profile(self, widget, profile):
+        if profile is None:
+            self._proxy_profile_name = ''
+            # show all the entrys and set default values
+            self.auth_box.set_active(False)
+            self.auth_box.set_checkbox_visible(True)
+            self.auth_box.show()
+            self.box_username.clear()
+            self.box_username.show()
+            self.box_password.clear()
+            self.box_password.show()
+            for box in (self.box_http, self.box_https, self.box_ftp,
+                        self.box_socks):
+                box.show()
+                box.set_host('')
+                box.set_port(DEFAULT_PROXY_PORT)
+            return
+
+        self._proxy_profile_name = profile['title']
+
+        # load the configuration in the profile
+        self.auth_box.set_active(self._model.parameter_as_boolean(
+            profile, 'use_authentication'))
+        hostname = ''
+        if 'http_proxy.host' in profile:
+            if profile['http_proxy.host'] != 'REQUEST':
+                hostname = profile['http_proxy.host']
+        self.box_http.set_host(hostname)
+
+        port = DEFAULT_PROXY_PORT
+        if 'http_proxy.port' in profile:
+            try:
+                port = int(profile['http_proxy.port'])
+            except:
+                pass
+        self.box_http.set_port(port)
+
+        # if is configured use the same ip/port for all the services
+        if self._model.parameter_as_boolean(profile, 'use_same_proxy'):
+            for box in (self.box_https, self.box_ftp, self.box_socks):
+                box.set_host(hostname)
+                box.set_port(port)
+                box.hide()
+        else:
+            service_box = {'https': self.box_https,
+                           'ftp': self.box_ftp,
+                           'socks': self.box_socks}
+
+            for service in service_box.keys():
+                parameter = '%s_proxy.host' % service
+                hostname = ''
+                if parameter in profile:
+                    hostname = profile[parameter]
+
+                parameter = '%s_proxy.port' % service
+                port = DEFAULT_PROXY_PORT
+                if parameter in profile:
+                    try:
+                        port = int(profile[parameter])
+                    except:
+                        pass
+                box = service_box[service]
+                box.set_host(hostname)
+                box.set_port(port)
+                box.hide()
+
+        if 'use_authentication' in profile:
+            self.auth_box.set_checkbox_visible(False)
+
+        # only show the fields where the value is REQUEST
+        parameter_widget = {'authentication_user': self.box_username,
+                            'authentication_password': self.box_password,
+                            'http_proxy.host': self.box_http}
+
+        for parameter in parameter_widget.keys():
+            visible = True
+            if parameter in profile:
+                visible = (profile[parameter].upper() == 'REQUEST')
+            if visible:
+                parameter_widget[parameter].show_all()
+            else:
+                parameter_widget[parameter].hide()
+
+        #ignore_hosts = schoolserver,server,localhost,127.0.0.0/8
 
     def setup(self):
         self._entry.set_text(self._model.get_jabber())
@@ -503,6 +662,7 @@ class Network(SectionView):
     def apply(self):
         for setting in self._proxy_settings.values():
             setting.apply()
+        self._model.set_proxy_profile_name(self._proxy_profile_name)
 
         if self._hidden_conn_manager.enabled:
             self._hidden_conn_manager.set_hidden_ssid(
