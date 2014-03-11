@@ -525,12 +525,16 @@ class Network(SectionView):
             combo_setting_box.combo_box.get_model().get(giter, 3)[0]
 
         # load the values previously stored
-        stored_parameters = self._hidden_conn_manager.stored_parameters[
-            self._hidden_conn_manager.selected_profile['title']]
-        for entry in self._entries_properties.keys():
-            property_name = self._entries_properties[entry]
-            if property_name in stored_parameters.keys():
-                entry.set_text(stored_parameters[property_name])
+        if self._hidden_conn_manager.selected_profile is not None:
+            stored_parameters = self._hidden_conn_manager.stored_parameters[
+                self._hidden_conn_manager.selected_profile['title']]
+            for entry in self._entries_properties.keys():
+                property_name = self._entries_properties[entry]
+                if property_name in stored_parameters.keys():
+                    entry.set_text(stored_parameters[property_name])
+        else:
+            for entry in self._entries_properties.keys():
+                entry.set_text('')
 
     def __connect_hidden_net_cb(self, button):
 
