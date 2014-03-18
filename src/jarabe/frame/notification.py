@@ -52,7 +52,7 @@ class NotificationBox(Gtk.VBox):
         self._notifications_box.show()
 
         self._scrolled_window = Gtk.ScrolledWindow()
-        self._scrolled_window.add(self._notifications_box)
+        self._scrolled_window.add_with_viewport(self._notifications_box)
         self._scrolled_window.set_policy(Gtk.PolicyType.NEVER,
                                          Gtk.PolicyType.AUTOMATIC)
         self._scrolled_window.show()
