@@ -78,8 +78,7 @@ class NotificationBox(Gtk.VBox):
         entries = self._notifications_box.get_children()
 
         height = 0
-        fitting = min(self.MAX_ENTRIES, len(entries))
-        for entry in entries[:fitting]:
+        for entry in entries[:self.MAX_ENTRIES]:
             requests = entry.get_preferred_size()
             height += requests[1].height
 
