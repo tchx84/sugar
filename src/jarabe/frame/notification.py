@@ -69,10 +69,16 @@ class NotificationBox(Gtk.VBox):
         self.add(clear_item)
 
         self._service = notifications.get_service()
-        for entry in self._service.retrieve_by_name(self._name):
-            self._add(entry['summary'], entry['body'])
+        entries = self._service.retrieve_by_name(self._name)
+
+        if entries:
+            for entry in entries:
+                self._add(entry['summary'], entry['body'])
+
         self._service.notification_received.connect(
             self.__notification_received_cb)
+
+        self.connect('destroy', self.__destroy_cb)
 
     def _update_scrolled_size(self):
         entries = self._notifications_box.get_children()
@@ -137,6 +143,12 @@ class NotificationBox(Gtk.VBox):
         logging.debug('NotificationBox.__notification_received_cb')
         if kwargs.get('app_name', '') == self._name:
             self._add(kwargs.get('summary', ''), kwargs.get('body', ''))
+
+    def __destroy_cb(self, box):
+        logging.debug('NotificationBox.__destroy_cb')
+        service = notifications.get_service()
+        service.notification_received.disconnect(
+            self. __notification_received_cb)
 
 
 class NotificationButton(ToolButton):
