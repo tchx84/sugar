@@ -254,9 +254,14 @@ class Frame(object):
         window.destroy()
         del self._notif_by_icon[icon]
 
+    def __button_release_event_cb(self, icon, data=None):
+        self.remove_notification(icon)
+        self.show()
+
     def __notification_received_cb(self, **kwargs):
         logging.debug('__notification_received_cb')
         icon = NotificationIcon()
+        icon.connect('button-release-event', self.__button_release_event_cb)
 
         hints = kwargs['hints']
 
