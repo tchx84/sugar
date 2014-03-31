@@ -220,6 +220,29 @@ class StringSettingBox(SettingBox):
         self._entry.set_text('')
 
 
+class StringBox(SettingBox):
+    """
+    A configuration line for a string not ussing gsettings to store it.
+    """
+    def __init__(self, name, size_group=None, password_field=False):
+        SettingBox.__init__(self, name, size_group)
+
+        self._entry = Gtk.Entry()
+        self.pack_start(self._entry, True, True, 0)
+        self._entry.show()
+        if password_field:
+            self._entry.set_visibility(False)
+
+    def clear(self):
+        self._entry.set_text('')
+
+    def set_text(self, text):
+        self._entry.set_text(text)
+
+    def get_text(self):
+        return self._entry.get_text()
+
+
 class Network(SectionView):
     def __init__(self, model, alerts):
         SectionView.__init__(self)
@@ -711,8 +734,25 @@ class Network(SectionView):
         manual_proxy_box.pack_start(self.box_socks, False, False, 0)
         self.box_socks.show()
 
+        # cntlm fields, hidden by default
+        self.box_cntlm_user = StringBox(_('Username:'), size_group)
+        manual_proxy_box.pack_start(self.box_cntlm_user, False, False, 0)
+
+        self.box_cntlm_password = StringBox(_('Password:'), size_group, True)
+        manual_proxy_box.pack_start(self.box_cntlm_password, False, False, 0)
+
+        self.box_cntlm_host = StringBox(_('Host:'), size_group)
+        manual_proxy_box.pack_start(self.box_cntlm_host, False, False, 0)
+
+        self.box_cntlm_port = StringBox(_('Port:'), size_group)
+        manual_proxy_box.pack_start(self.box_cntlm_port, False, False, 0)
+
+        self.box_cntlm_domain = StringBox(_('Domain:'), size_group)
+        manual_proxy_box.pack_start(self.box_cntlm_domain, False, False, 0)
+
         # if a profile was selected update the combo value
         self._proxy_profile_name = self._model.get_proxy_profile_name()
+        self._proxy_profile_type = self._model.get_proxy_profile_type()
         logging.error('Proxy Profile selected %s', self._proxy_profile_name)
         if self._proxy_profile_name is not None and \
                 self._proxy_profile_name != '':
@@ -724,6 +764,7 @@ class Network(SectionView):
     def _apply_proxy_profile(self, widget, profile):
         if profile is None:
             self._proxy_profile_name = ''
+            self._proxy_profile_type = ''
             # show all the entrys and set default values
             self.auth_box.set_active(False)
             self.auth_box.set_checkbox_visible(True)
@@ -732,6 +773,12 @@ class Network(SectionView):
             self.box_username.show()
             self.box_password.clear()
             self.box_password.show()
+
+            for box in (self.box_cntlm_user, self.box_cntlm_password,
+                        self.box_cntlm_host, self.box_cntlm_port,
+                        self.box_cntlm_domain):
+                box.hide()
+
             for box in (self.box_http, self.box_https, self.box_ftp,
                         self.box_socks):
                 box.show()
@@ -740,6 +787,18 @@ class Network(SectionView):
             return
 
         self._proxy_profile_name = profile['title']
+        self._proxy_profile_type = ''
+        if 'proxy_type' in profile:
+            self._proxy_profile_type = profile['proxy_type']
+
+        if self._proxy_profile_type == 'cntlm':
+            (user, password, domain, host,
+             port) = self._model.get_cntlm_parameters()
+            self.box_cntlm_user.set_text(user)
+            self.box_cntlm_password.set_text(password)
+            self.box_cntlm_domain.set_text(domain)
+            self.box_cntlm_host.set_text(host)
+            self.box_cntlm_port.set_text(port)
 
         # load the configuration in the profile
         self.auth_box.set_active(self._model.parameter_as_boolean(
@@ -793,10 +852,17 @@ class Network(SectionView):
         # only show the fields where the value is REQUEST
         parameter_widget = {'authentication_user': self.box_username,
                             'authentication_password': self.box_password,
-                            'http_proxy.host': self.box_http}
+                            'http_proxy.host': self.box_http,
+                            'cntlm.user': self.box_cntlm_user,
+                            'cntlm.password': self.box_cntlm_password,
+                            'cntlm.host': self.box_cntlm_host,
+                            'cntlm.port': self.box_cntlm_port,
+                            'cntlm.domain': self.box_cntlm_domain}
 
         for parameter in parameter_widget.keys():
             visible = True
+            if 'cntlm' in parameter:
+                visible = False
             if parameter in profile:
                 visible = (profile[parameter].upper() == 'REQUEST')
             if visible:
@@ -839,6 +905,16 @@ class Network(SectionView):
     def apply(self):
         for setting in self._proxy_settings.values():
             setting.apply()
+
+        self._model.set_proxy_profile_type(self._proxy_profile_type)
+        # set cntlm values
+        if self._proxy_profile_type == 'cntlm':
+            user = self.box_cntlm_user.get_text()
+            password = self.box_cntlm_password.get_text()
+            domain = self.box_cntlm_domain.get_text()
+            host = self.box_cntlm_host.get_text()
+            port = self.box_cntlm_port.get_text()
+            self._model.apply_cntlm_configs(user, password, domain, host, port)
 
         self._model.set_proxy_profile_name(self._proxy_profile_name)
 
