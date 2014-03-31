@@ -155,7 +155,14 @@ class AudioManagerWidget(Gtk.VBox):
         grid.attach(button, 1, 0, 1, 1)
         grid.show()
 
-        self.add(grid)
+        alignment = Gtk.Alignment()
+        alignment.set(0.5, 0, 0, 0)
+        alignment.set_padding(0, 0, style.DEFAULT_SPACING,
+                              style.DEFAULT_SPACING)
+        alignment.add(grid)
+        alignment.show()
+
+        self.add(alignment)
 
         self._adjustment_hid = \
             self._adjustment.connect('value_changed',
