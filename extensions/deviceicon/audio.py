@@ -34,7 +34,7 @@ from sugar3.graphics.palettemenu import PaletteMenuItemSeparator
 from sugar3.graphics.xocolor import XoColor
 
 from jarabe.frame.frameinvoker import FrameWidgetInvoker
-from jarabe.model import sound
+from jarabe.model.sound import sound
 from jarabe.model.sound import capture_sound
 
 _ICON_NAME = 'speaker'
@@ -106,9 +106,8 @@ class AudioManagerWidget(Gtk.VBox):
 
         icon = Icon(icon_size=Gtk.IconSize.MENU)
         icon.props.icon_name = icon_name
-        icon.props.xo_color = XoColor('%s,%s' %
-            (style.COLOR_WHITE.get_svg(),
-             style.COLOR_BUTTON_GREY.get_svg()))
+        icon.props.xo_color = XoColor('%s,%s' % (style.COLOR_WHITE.get_svg(),
+                                      style.COLOR_BUTTON_GREY.get_svg()))
         icon.show()
 
         label = Gtk.Label(text)
@@ -158,8 +157,9 @@ class AudioManagerWidget(Gtk.VBox):
 
         self.add(grid)
 
-        self._adjustment_hid = self._adjustment.connect('value_changed',
-            self.__level_adjusted_cb)
+        self._adjustment_hid = \
+            self._adjustment.connect('value_changed',
+                                     self.__level_adjusted_cb)
 
     def update_level(self):
         self._adjustment.handler_block(self._adjustment_hid)
@@ -171,7 +171,7 @@ class AudioManagerWidget(Gtk.VBox):
             self._button.set_image(self._ok_icon)
         else:
             self._button.set_image(self._cancel_icon)
-            
+
     def __level_adjusted_cb(self, device, data=None):
         value = self._adjustment.props.value
         self._device.props.level = value
