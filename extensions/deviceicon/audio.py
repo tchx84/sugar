@@ -95,162 +95,141 @@ class DeviceView(TrayIcon):
         self._update_output_info()
 
 
+class AudioManagerWidget(Gtk.VBox):
+
+    def __init__(self, text, icon_name, device):
+        Gtk.VBox.__init__(self)
+        self._device = device
+
+        self._ok_icon = Icon(icon_name='dialog-ok')
+        self._cancel_icon = Icon(icon_name='dialog-cancel')
+
+        icon = Icon(icon_size=Gtk.IconSize.MENU)
+        icon.props.icon_name = icon_name
+        icon.props.xo_color = XoColor('%s,%s' %
+            (style.COLOR_WHITE.get_svg(),
+             style.COLOR_BUTTON_GREY.get_svg()))
+        icon.show()
+
+        label = Gtk.Label(text)
+        label.show()
+
+        grid = Gtk.Grid()
+        grid.set_column_spacing(style.DEFAULT_SPACING)
+        grid.attach(icon, 0, 0, 1, 1)
+        grid.attach(label, 1, 0, 1, 1)
+        grid.show()
+
+        alignment = Gtk.Alignment()
+        alignment.set(0.5, 0, 0, 0)
+        alignment.add(grid)
+        alignment.show()
+
+        self.add(alignment)
+
+        adjustment = Gtk.Adjustment(
+            value=device.props.level,
+            lower=0,
+            upper=100 + sound.VOLUME_STEP,
+            step_incr=sound.VOLUME_STEP,
+            page_incr=sound.VOLUME_STEP,
+            page_size=sound.VOLUME_STEP)
+        self._adjustment = adjustment
+
+        hscale = Gtk.HScale()
+        hscale.props.draw_value = False
+        hscale.set_adjustment(adjustment)
+        hscale.set_digits(0)
+        hscale.set_size_request(style.GRID_CELL_SIZE * 4, -1)
+        hscale.show()
+
+        button = Gtk.Button()
+        button.props.relief = Gtk.ReliefStyle.NONE
+        button.props.focus_on_click = False
+        button.connect('clicked', self.__muted_clicked_cb)
+        button.show()
+        self._button = button
+
+        grid = Gtk.Grid()
+        grid.set_column_spacing(style.DEFAULT_SPACING)
+        grid.attach(hscale, 0, 0, 1, 1)
+        grid.attach(button, 1, 0, 1, 1)
+        grid.show()
+
+        self.add(grid)
+
+        self._adjustment_hid = self._adjustment.connect('value_changed',
+            self.__level_adjusted_cb)
+
+    def update_level(self):
+        self._adjustment.handler_block(self._adjustment_hid)
+        self._adjustment.props.value = self._device.props.level
+        self._adjustment.handler_unblock(self._adjustment_hid)
+
+    def update_muted(self):
+        if self._device.props.muted:
+            self._button.set_image(self._ok_icon)
+        else:
+            self._button.set_image(self._cancel_icon)
+            
+    def __level_adjusted_cb(self, device, data=None):
+        value = self._adjustment.props.value
+        self._device.props.level = value
+
+        #FIXME use callbacks intead
+        if value <= 0:
+            self._device.props.muted = True
+        else:
+            self._device.props.muted = False
+        self.update_muted()
+
+    def __muted_clicked_cb(self, button, data=None):
+        muted = not self._device.props.muted
+        self._device.props.muted = muted
+        self.update_muted()
+
+        # FIXME use callbacks instead
+        if muted:
+            self._device.props.level = 0
+        else:
+            self._device.props.level = self._device.props.last_level
+        self.update_level()
+
+
 class AudioPalette(Palette):
 
     def __init__(self, primary_text, output_text, input_text, output_model,
                  input_model):
         Palette.__init__(self, label=primary_text)
 
-        self._models = {'output': output_model, 'input': input_model}
-        self._adjustments = {}
-        self._adjustment_handler_ids = {}
-        self._buttons = {}
-
-        self._ok_icons = {'output': Icon(icon_name='dialog-ok'),
-                          'input': Icon(icon_name='dialog-ok')}
-        self._cancel_icons = {'output': Icon(icon_name='dialog-cancel'),
-                              'input': Icon(icon_name='dialog-cancel')}
-
-        self._box = PaletteMenuBox()
-        self.set_content(self._box)
-        self._box.show()
-
-        self._add_menu_item('media-audio-input', input_text, 'input')
+        self._capture_manager = AudioManagerWidget(input_text,
+                                                   'media-audio-input',
+                                                   input_model)
+        self._capture_manager.show()
 
         separator = PaletteMenuItemSeparator()
-        self._box.append_item(separator)
         separator.show()
 
-        self._add_menu_item('speaker-100', output_text, 'output')
+        self._speaker_manager = AudioManagerWidget(output_text,
+                                                   'speaker-100',
+                                                   output_model)
+        self._speaker_manager.show()
+
+        self._box = PaletteMenuBox()
+        self._box.append_item(self._capture_manager, 0, 0)
+        self._box.append_item(separator, 0, 0)
+        self._box.append_item(self._speaker_manager, 0, 0)
+        self._box.show()
+
+        self.set_content(self._box)
 
         self.connect('popup', self.__popup_cb)
 
-    def _add_menu_item(self, label_icon, label_text, device):
-        icon = Icon(icon_size=Gtk.IconSize.MENU)
-        icon.props.icon_name = label_icon
-        icon.props.xo_color = XoColor('%s,%s' %
-                                      (style.COLOR_WHITE.get_svg(),
-                                       style.COLOR_BUTTON_GREY.get_svg()))
-
-        label = Gtk.Label(label_text)
-
-        alignment = Gtk.Alignment()
-        alignment.set(0.5, 0, 0, 0)
-        grid = Gtk.Grid()
-        grid.set_column_spacing(style.DEFAULT_SPACING)
-        grid.attach(icon, 0, 0, 1, 1)
-        icon.show()
-        grid.attach(label, 1, 0, 1, 1)
-        label.show()
-        alignment.add(grid)
-        grid.show()
-        self._box.append_item(alignment, horizontal_padding=0,
-                              vertical_padding=0)
-        alignment.show()
-
-        grid = Gtk.Grid()
-        grid.set_column_spacing(style.DEFAULT_SPACING)
-
-        vol_step = sound.VOLUME_STEP
-        self._adjustments[device] = Gtk.Adjustment(
-            value=self._models[device].props.level,
-            lower=0,
-            upper=100 + vol_step,
-            step_incr=vol_step,
-            page_incr=vol_step,
-            page_size=vol_step)
-
-        hscale = Gtk.HScale()
-        hscale.props.draw_value = False
-        hscale.set_adjustment(self._adjustments[device])
-        hscale.set_digits(0)
-        hscale.set_size_request(style.GRID_CELL_SIZE * 4, -1)
-        grid.attach(hscale, 0, 0, 1, 1)
-        hscale.show()
-
-        self._buttons[device] = Gtk.Button()
-        self._buttons[device].connect('clicked',
-                                      self.__mute_clicked_cb, device)
-        self._buttons[device].props.relief = Gtk.ReliefStyle.NONE
-        self._buttons[device].props.focus_on_click = False
-        grid.attach(self._buttons[device], 1, 0, 1, 1)
-        self._box.append_item(grid)
-        grid.show()
-
-        self._adjustment_handler_ids[device] = \
-            self._adjustments[device].connect(
-                'value_changed', self.__adjustment_changed_cb, device)
-
-    def _update_muted(self, devices):
-        for device in devices:
-            if self._models[device].props.muted:
-                icon_name = self._ok_icons[device]
-            else:
-                icon_name = self._cancel_icons[device]
-            self._buttons[device].set_image(icon_name)
-            self._buttons[device].show()
-
-    def _set_muted(self, device, muted):
-        self._models[device].props.muted = muted
-
-        self._adjustments[device].handler_block(
-            self._adjustment_handler_ids[device])
-        try:
-            if muted:
-                self._adjustments[device].props.value = 0
-                self._models[device].props.level = 0
-            else:
-                self._adjustments[device].props.value = \
-                    self._models[device].props.last_level
-                self._models[device].props.level = \
-                    self._models[device].props.last_level
-        finally:
-            self._adjustments[device].handler_unblock(
-                self._adjustment_handler_ids[device])
-
-        if muted:
-            icon_name = self._ok_icons[device]
-        else:
-            icon_name = self._cancel_icons[device]
-        self._buttons[device].set_image(icon_name)
-
-    def _update_level(self, devices):
-        for device in devices:
-            if self._adjustments[device].props.value != \
-               self._models[device].props.level:
-                self._adjustments[device].handler_block(
-                    self._adjustment_handler_ids[device])
-                try:
-                    self._adjustments[device].props.value = \
-                        self._models[device].props.level
-                finally:
-                    self._adjustments[device].handler_unblock(
-                        self._adjustment_handler_ids[device])
-
-    def __adjustment_changed_cb(self, widget_, device):
-        self._models[device].props.level = \
-            self._adjustments[device].props.value
-
-        muted = self._adjustments[device].props.value == 0
-        self._models[device].props.muted = muted
-        if muted:
-            icon_name = self._ok_icons[device]
-        else:
-            icon_name = self._cancel_icons[device]
-        self._buttons[device].set_image(icon_name)
-
-    def __level_changed_cb(self, pspec_, param_, device):
-        self._update_level([device])
-
-    def __mute_clicked_cb(self, button, device):
-        self._set_muted(device, not self._models[device].props.muted)
-
-    def __muted_changed_cb(self, pspec_, param_, device):
-        self._set_muted(device, self._models[device].props.muted)
-
-    def __popup_cb(self, palette_):
-        self._update_level(['output', 'input'])
-        self._update_muted(['output', 'input'])
+    def __popup_cb(self, palette):
+        self._speaker_manager.update_level()
+        self._speaker_manager.update_muted()
+        self._capture_manager.update_level()
+        self._capture_manager.update_muted()
 
 
 class DeviceModelAudio(GObject.GObject):
