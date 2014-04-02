@@ -113,6 +113,8 @@ class ProxyModeCombo(ComboSettingBox):
                      Gio.SettingsBindFlags.DEFAULT)
 
         self.connect('changed', self.__combo_changed_cb)
+        # display the box with the initial value
+        self.__combo_changed_cb(self)
 
     def __combo_changed_cb(self, combo_setting_box):
         giter = combo_setting_box.combo_box.get_active_iter()
