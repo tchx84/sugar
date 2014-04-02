@@ -598,6 +598,8 @@ class SecretsResponse(object):
 class HiddenNetworkManager():
 
     def __init__(self, conn_profiles={}):
+        self._active_device = None
+
         client = GConf.Client.get_default()
         self.enabled = client.get_bool(
             '/desktop/sugar/extensions/network/conf_hidden_ssid')
@@ -664,6 +666,10 @@ class HiddenNetworkManager():
 
     def create_and_connect_by_ssid(self, ssid):
         logging.debug('create_and_connect_by_ssid ssid=%s', ssid)
+        if self._active_device is None:
+            logging.error('Error trying to connect to hidden ssid, '
+                          'device not found')
+            return
         # save in gconf
         client = GConf.Client.get_default()
         client.set_string(
@@ -712,6 +718,10 @@ class HiddenNetworkManager():
             'ipv4.method': 'auto',
                 }
         """
+        if self._active_device is None:
+            logging.error('Error trying to connect to hidden ssid by '
+                          'profile, device not found')
+            return
         if self.selected_profile is None:
             logging.error('No profile selected')
             return
