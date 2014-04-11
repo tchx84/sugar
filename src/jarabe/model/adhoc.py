@@ -19,6 +19,7 @@ import logging
 import dbus
 import uuid
 from gi.repository import GObject
+from gi.repository import Gio
 
 from jarabe.model import network
 from jarabe.model.network import Settings
@@ -50,7 +51,7 @@ class AdHocManager(GObject.GObject):
                           ([GObject.TYPE_PYOBJECT, GObject.TYPE_PYOBJECT])),
     }
 
-    _AUTOCONNECT_TIMEOUT = 60
+    _AUTOCONNECT_DISABLED = -1
     _CHANNEL_1 = 1
     _CHANNEL_6 = 6
     _CHANNEL_11 = 11
@@ -72,6 +73,9 @@ class AdHocManager(GObject.GObject):
         for channel in (self._CHANNEL_1, self._CHANNEL_6, self._CHANNEL_11):
             if not self._find_connection(channel):
                 self._add_connection(channel)
+
+        settings = Gio.Settings('org.sugarlabs.network')
+        self._autoconnect_timeout = settings.get_int('adhoc-timeout')
 
     def start_listening(self, device):
         self._listening_called += 1
@@ -143,10 +147,13 @@ class AdHocManager(GObject.GObject):
         in NM_DEVICE_STATE_UNMANAGED). It is assumed that initialisation
         will complete quickly, and long before the timeout ticks.
         """
+        if self._autoconnect_timeout == self._AUTOCONNECT_DISABLED:
+            return
+
         if self._idle_source != 0:
             GObject.source_remove(self._idle_source)
         self._idle_source = GObject.timeout_add_seconds(
-            self._AUTOCONNECT_TIMEOUT, self.__idle_check_cb)
+            self._autoconnect_timeout, self.__idle_check_cb)
 
     def __idle_check_cb(self):
         if self._device_state == network.NM_DEVICE_STATE_DISCONNECTED:

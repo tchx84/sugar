@@ -203,6 +203,11 @@
             <summary>Show Sugar Ad-hoc networks</summary>
             <description>If TRUE, Sugar will show default Ad-hoc networks for channel 1,6 and 11. If Sugar sees no "known" network when it starts, it does autoconnect to an Ad-hoc network.</description>
         </key>
+        <key name="adhoc-timeout" type="i">
+            <default>60</default>
+            <summary>Sugar Ad-hoc Timeout</summary>
+            <description>Time, in seconds, in which Sugar is going to autoconnect to the Ad-hoc network. To disable autoconnect set it to -1.</description>
+        </key>
         <child name="gsm" schema="org.sugarlabs.network.gsm" />
     </schema>
     <schema id="org.sugarlabs.network.gsm" path="/org/sugarlabs/network/gsm/">
