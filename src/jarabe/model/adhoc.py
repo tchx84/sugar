@@ -64,6 +64,7 @@ class AdHocManager(GObject.GObject):
         self._listening_called = 0
         self._device_state = network.NM_DEVICE_STATE_UNKNOWN
 
+        self._last_channel = None
         self._current_channel = None
         self._networks = {self._CHANNEL_1: None,
                           self._CHANNEL_6: None,
@@ -158,9 +159,14 @@ class AdHocManager(GObject.GObject):
 
     def _autoconnect_adhoc(self):
         """First we try if there is an Ad-hoc network that is used by other
-        learners in the area, if not we default to channel 1.
-
+        learners in the area, preferably in the same channel we were before,
+        if not we default to channel 1.
         """
+        if self._last_channel in self._networks and \
+                self._networks[self._last_channel] is not None:
+            self.activate_channel(self._last_channel)
+            return
+
         if self._networks[self._CHANNEL_1] is not None:
             self.activate_channel(self._CHANNEL_1)
         elif self._networks[self._CHANNEL_6] is not None:
@@ -168,7 +174,7 @@ class AdHocManager(GObject.GObject):
         elif self._networks[self._CHANNEL_11] is not None:
             self.activate_channel(self._CHANNEL_11)
         else:
-            self.activate_channel(self._CHANNEL_1)
+            self.activate_channel(self._last_channel or self._CHANNEL_1)
 
     def activate_channel(self, channel):
         """Activate a sugar Ad-hoc network.
@@ -180,6 +186,7 @@ class AdHocManager(GObject.GObject):
         connection = self._find_connection(channel)
         if connection:
             connection.activate(self._device.object_path)
+            self._last_channel = channel
 
     @staticmethod
     def _get_connection_id(channel):
@@ -227,6 +234,7 @@ class AdHocManager(GObject.GObject):
                         network.NM_SERVICE, network.NM_PATH)
                     netmgr = dbus.Interface(obj, network.NM_IFACE)
                     netmgr.DeactivateConnection(connection_o)
+                    self._last_channel = None
 
     def __get_active_connections_error_cb(self, err):
         logging.error('Error getting the active connections: %s', err)
