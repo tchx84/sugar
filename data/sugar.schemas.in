@@ -367,6 +367,18 @@
     </schema>
 
     <schema>
+      <key>/schemas/desktop/sugar/network/adhoc_autoconnect</key>
+      <applyto>/desktop/sugar/network/adhoc_autoconnect</applyto>
+      <owner>sugar</owner>
+      <type>bool</type>
+      <default>true</default>
+      <locale name="C">
+        <short>Autoconnect to Ad-hoc networks</short>
+        <long>If TRUE, Sugar will autoconnect to Ad-hoc network</long>
+      </locale>
+    </schema>
+
+    <schema>
       <key>/schemas/desktop/sugar/protected_activities</key>
       <applyto>/desktop/sugar/protected_activities</applyto>
       <owner>sugar</owner>
