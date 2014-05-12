@@ -376,7 +376,7 @@ class EapSecurity(object):
     def get_dict(self):
         eap_security = {}
         if self.eap is not None:
-            eap_security['eap'] = [self.eap]
+            eap_security['eap'] = self.eap
         if self.identity is not None:
             eap_security['identity'] = self.identity
         if self.password is not None:
