@@ -418,7 +418,8 @@ class Network(SectionView):
         size_group = Gtk.SizeGroup(Gtk.SizeGroupMode.HORIZONTAL)
 
         hidden_network_name_box = Gtk.VBox()
-        option_sets = [('No security', '', hidden_network_name_box, None)]
+        option_sets = [('None', '', None, None),
+                       ('No security', '', hidden_network_name_box, None)]
         self._entries_properties = {}
         name_box = SettingBox(_("Name"), size_group)
         name_box.show()
@@ -500,17 +501,19 @@ class Network(SectionView):
         self._combo_setting_box.connect('changed',
                                         self._select_hidden_network_profile)
 
-        # show the widgets for the configured mode
-        self._init_hidden_network_mode()
-
         btn_box = Gtk.HBox()
-        create_connection_btn = Gtk.Button('Connect')
-        create_connection_btn.connect('clicked', self.__connect_hidden_net_cb)
-        btn_box.pack_start(create_connection_btn, False, False, 0)
+        self.create_connection_btn = Gtk.Button('Connect')
+        self.create_connection_btn.connect('clicked',
+                                           self.__connect_hidden_net_cb)
+        btn_box.pack_start(self.create_connection_btn, False, False, 0)
         box_hidden_network.pack_start(btn_box, False, False, 0)
         btn_box.show_all()
 
         workspace.pack_start(box_hidden_network, False, False, 0)
+
+        # show the widgets for the configured mode
+        self._init_hidden_network_mode()
+
         box_hidden_network.show()
 
     def _init_hidden_network_mode(self):
@@ -522,6 +525,7 @@ class Network(SectionView):
             self._combo_setting_box.combo_box.set_active(0)
             self._hidden_network_name_entry.set_text(
                 self._hidden_conn_manager.selected_ssid)
+            self.create_connection_btn.set_sensitive(True)
 
         elif self._hidden_conn_manager.selected_profile:
             combo_model = self._combo_setting_box.combo_box.get_model()
@@ -535,10 +539,12 @@ class Network(SectionView):
                     self._combo_setting_box.combo_box.set_active(posi)
                 combo_iter = combo_model.iter_next(combo_iter)
                 posi += 1
+            self.create_connection_btn.set_sensitive(True)
         else:
             # if nothing configured
             self._combo_setting_box.combo_box.set_active(0)
             self._hidden_network_name_entry.set_text('')
+            self.create_connection_btn.set_sensitive(False)
 
     def _select_hidden_network_profile(self, combo_setting_box):
         giter = combo_setting_box.combo_box.get_active_iter()
@@ -546,6 +552,10 @@ class Network(SectionView):
         current_box = self._hidden_network_params_box.get_children()
         if current_box:
             self._hidden_network_params_box.remove(current_box[0])
+
+        self.create_connection_btn.set_sensitive(bool(new_box))
+        if new_box is None:
+            return
 
         self._hidden_network_params_box.add(new_box)
         new_box.show()
@@ -575,6 +585,10 @@ class Network(SectionView):
                 self._hidden_conn_manager.store_empty_config()
         else:
 
+            if not self._hidden_network_params_box.get_children():
+                # the user selected the first option
+                self._hidden_conn_manager.store_empty_config()
+                return
             # get the values from all the entries
             current_box = self._hidden_network_params_box.get_children()[0]
             requested_parameters = []
