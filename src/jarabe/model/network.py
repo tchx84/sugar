@@ -702,6 +702,14 @@ class HiddenNetworkManager():
                 connection.get_path(),
                 self._active_device, '/')
 
+    def store_empty_config(self):
+        # save in gconf
+        client = GConf.Client.get_default()
+        client.set_string(
+            '/desktop/sugar/extensions/network/hidden_network_profile', '')
+        client.set_string(
+            '/desktop/sugar/extensions/network/hidden_network_ssid', '')
+
     def create_and_connect_by_profile(self):
         """
         A profile is a dictionary with a format like this

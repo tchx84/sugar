@@ -538,6 +538,7 @@ class Network(SectionView):
         else:
             # if nothing configured
             self._combo_setting_box.combo_box.set_active(0)
+            self._hidden_network_name_entry.set_text('')
 
     def _select_hidden_network_profile(self, combo_setting_box):
         giter = combo_setting_box.combo_box.get_active_iter()
@@ -570,6 +571,8 @@ class Network(SectionView):
             if self._hidden_network_name_entry.get_text() != '':
                 self._hidden_conn_manager.create_and_connect_by_ssid(
                     self._hidden_network_name_entry.get_text())
+            else:
+                self._hidden_conn_manager.store_empty_config()
         else:
 
             # get the values from all the entries
