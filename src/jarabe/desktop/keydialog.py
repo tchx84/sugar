@@ -97,6 +97,8 @@ class NetworkParameters(Gtk.HBox):
 
         if self._is_entry():
             self._entry = Gtk.Entry()
+            if 'password' in self._key:
+                self._entry.set_visibility(False)
             self.pack_start(self._entry, True, True, 0)
             self._entry.show()
         elif self._is_liststore():
