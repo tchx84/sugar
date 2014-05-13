@@ -471,6 +471,8 @@ class Network(SectionView):
                                     style.DEFAULT_SPACING)
                                 setting_box.set_spacing(style.DEFAULT_SPACING)
                                 entry = Gtk.Entry()
+                                if 'password' in key:
+                                    entry.set_visibility(False)
                                 setting_box.pack_start(entry, True, True, 0)
                                 box.pack_start(setting_box, True, True, 0)
                                 self._entries_properties[entry] = key
