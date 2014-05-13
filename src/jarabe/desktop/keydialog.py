@@ -277,14 +277,9 @@ class KeyValuesDialog(Gtk.Dialog):
                 key = child._get_key()
                 value = child._get_value()
                 self._add_key_value(key, value)
-
-            key_dialog.destroy()
             self._final_callback(self._settings,
                                  self._selected_auth_list)
-        else:
-            response = key_dialog.get_response_object()
-            response.set_error(CanceledKeyRequestError())
-            key_dialog.destroy()
+        key_dialog.destroy()
 
     def _add_key_value(self, key, value):
         for auth_param in self._selected_auth_list._params_list:
