@@ -656,10 +656,7 @@ class HiddenNetworkManager():
         device_type = props.Get(NM_DEVICE_IFACE, 'DeviceType')
         logging.debug('device_type = %s', device_type)
         if device_type == NM_DEVICE_TYPE_WIFI:
-            state = props.Get(NM_DEVICE_IFACE, 'State')
-            logging.debug('state %s', state)
-            if state == 100:  # Activated
-                self._active_device = device_o
+            self._active_device = device_o
 
     def _get_device_path_error_cb(self, err):
         logging.error('Failed to get device type: %s', err)
