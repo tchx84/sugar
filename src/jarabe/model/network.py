@@ -676,7 +676,7 @@ class HiddenNetworkManager():
 
         connection = find_connection_by_ssid(ssid)
         if connection is None:
-            logging.error('connection is None')
+            logging.debug('connection is None')
             # Th connection do not exists
             settings = Settings()
             settings.connection.id = ssid
@@ -687,14 +687,16 @@ class HiddenNetworkManager():
 
             settings.wireless.ssid = dbus.ByteArray(ssid)
             settings.wireless.hidden = True
-            logging.debug('AddAndActivateConnection')
+            logging.debug('AddAndActivateConnection settings %s device %s',
+                          settings.get_dict(), self._active_device)
             self._netmgr.AddAndActivateConnection(
                 settings.get_dict(),
                 self._active_device, '/',
                 reply_handler=self._add_connection_reply_cb,
                 error_handler=self._add_connection_error_cb)
         else:
-            logging.debug('ActivateConnection')
+            logging.debug('ActivateConnection connection %s device %s',
+                          connection.get_path(), self._active_device)
             self._netmgr.ActivateConnection(
                 connection.get_path(),
                 self._active_device, '/')
@@ -723,6 +725,7 @@ class HiddenNetworkManager():
             'ipv4.method': 'auto',
                 }
         """
+        logging.debug('create_and_connect_by_profile')
         if self._active_device is None:
             logging.error('Error trying to connect to hidden ssid by '
                           'profile, device not found')
@@ -743,6 +746,7 @@ class HiddenNetworkManager():
         connection = find_connection_by_ssid(profile['connection.id'])
         if connection is None:
             # Th connection do not exists
+            logging.debug('Connection not found')
             settings = Settings()
             settings.connection.id = profile['connection.id']
             settings.connection.type = profile['connection.type']
@@ -775,7 +779,8 @@ class HiddenNetworkManager():
                 settings.ip4_config = IP4Config()
                 settings.ip4_config.method = profile['ipv4.method']
 
-            logging.error('createby_profile %s', settings.get_dict())
+            logging.debug('AddAndActivateConnection settings %s device %s',
+                          settings.get_dict(), self._active_device)
 
             self._netmgr.AddAndActivateConnection(
                 settings.get_dict(),
@@ -783,6 +788,8 @@ class HiddenNetworkManager():
                 reply_handler=self._add_connection_reply_cb,
                 error_handler=self._add_connection_error_cb)
         else:
+            logging.debug('ActivateConnection connection %s device %s',
+                          connection.get_path(), self._active_device)
             self._netmgr.ActivateConnection(
                 connection.get_path(),
                 self._active_device, '/')
