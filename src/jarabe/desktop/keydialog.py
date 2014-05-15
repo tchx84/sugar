@@ -320,6 +320,7 @@ class KeyDialog(Gtk.Dialog):
 
     def add_key_entry(self):
         self._entry = Gtk.Entry()
+        self._entry.set_visibility(False)
         self._entry.connect('changed', self._update_response_sensitivity)
         self._entry.connect('activate', self._entry_activate_cb)
         self.vbox.pack_start(self._entry, True, True, 0)
