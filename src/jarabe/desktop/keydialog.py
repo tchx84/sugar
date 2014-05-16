@@ -29,6 +29,7 @@ import shutil
 from sugar3 import env
 from sugar3.graphics.icon import Icon
 from sugar3.graphics import style
+from sugar3.datastore import datastore
 from jarabe.model import network
 from jarabe.journal.objectchooser import ObjectChooser
 
@@ -140,32 +141,30 @@ class NetworkParameters(Gtk.HBox):
         self._show_picker_cb()
 
     def _show_picker_cb(self):
-        if not self._want_document:
-            return
         chooser = ObjectChooser()
+        chooser.connect('response', self._chooser_response_cb)
+        chooser.show()
 
-        try:
-            result = chooser.run()
-            if result == Gtk.ResponseType.ACCEPT:
-                jobject = chooser.get_selected_object()
-                if jobject and jobject.file_path:
-                    file_basename = os.path.basename(
-                        jobject._metadata._properties['title'])
-                    self._chooser_button.set_label(file_basename)
+    def _chooser_response_cb(self, chooser, response_id):
+        if response_id == Gtk.ResponseType.ACCEPT:
+            jobject_id = chooser.get_selected_object_id()
+            jobject = datastore.get(jobject_id)
 
-                    profile_path = env.get_profile_path()
-                    self._entry = os.path.join(profile_path, file_basename)
+            if jobject and jobject.file_path:
+                file_basename = os.path.basename(
+                    jobject._metadata._properties['title'])
+                self._chooser_button.set_label(file_basename)
 
-                    # Remove (older) file, if it exists.
-                    if os.path.exists(self._entry):
-                        os.remove(self._entry)
+                profile_path = env.get_profile_path()
+                self._entry = os.path.join(profile_path, file_basename)
 
-                    # Copy the file.
-                    shutil.copy2(jobject.file_path, self._entry)
+                # Remove (older) file, if it exists.
+                if os.path.exists(self._entry):
+                    os.remove(self._entry)
 
-        finally:
-            chooser.destroy()
-            del chooser
+                # Copy the file.
+                shutil.copy2(jobject.file_path, self._entry)
+        chooser.destroy()
 
     def _option_combo_changed_cb(self, widget):
         it = self._option_combo.get_active_iter()
