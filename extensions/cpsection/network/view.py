@@ -397,10 +397,19 @@ class Network(SectionView):
             self._connectivity_profiles)
         if self._hidden_conn_manager.enabled:
             self._add_hidden_ssid_section(workspace)
+        self._hidden_conn_manager.connect('error',
+                                          self.__hidden_network_error_msg)
+        self._hidden_conn_manager.connect('success', self.__hidden_network_msg)
 
         self._add_proxy_section(workspace)
 
         self.setup()
+
+    def __hidden_network_msg(self, hidden_manager, msg):
+        self._connection_status_label.set_text(msg)
+
+    def __hidden_network_error_msg(self, hidden_manager, msg):
+        self._connection_status_label.set_text('ERROR: %s' % msg)
 
     def _add_hidden_ssid_section(self, workspace):
         separator_hidden_network = Gtk.HSeparator()
@@ -502,10 +511,12 @@ class Network(SectionView):
                                         self._select_hidden_network_profile)
 
         btn_box = Gtk.HBox()
-        self.create_connection_btn = Gtk.Button('Connect')
+        self.create_connection_btn = Gtk.Button('Test connection')
         self.create_connection_btn.connect('clicked',
                                            self.__connect_hidden_net_cb)
         btn_box.pack_start(self.create_connection_btn, False, False, 0)
+        self._connection_status_label = Gtk.Label('')
+        btn_box.pack_start(self._connection_status_label, False, False, 10)
         box_hidden_network.pack_start(btn_box, False, False, 0)
         btn_box.show_all()
 
