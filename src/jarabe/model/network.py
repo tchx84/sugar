@@ -766,7 +766,7 @@ class HiddenNetworkManager():
 
                 if settings.wireless_security.key_mgmt == 'wpa-eap':
                     settings.wpa_eap_setting = EapSecurity()
-                    settings.wpa_eap_setting.eap = profile['802-1x.eap']
+                    settings.wpa_eap_setting.eap = [profile['802-1x.eap']]
                     settings.wpa_eap_setting.identity = profile[
                         '802-1x.identity']
                     settings.wpa_eap_setting.password = profile[
