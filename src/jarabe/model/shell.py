@@ -595,7 +595,8 @@ class ShellModel(GObject.GObject):
                     home_activity.get_launch_status() == Activity.LAUNCHING
 
             if home_activity is None and \
-                    window.get_window_type() == Wnck.WindowType.NORMAL:
+                    window.get_window_type() == Wnck.WindowType.NORMAL and \
+                    activity_id is not None:
                 # This is a special case for the Journal
                 # We check if is not a splash screen to avoid #4767
                 logging.debug('first window registered for %s', activity_id)
