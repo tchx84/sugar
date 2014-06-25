@@ -20,11 +20,13 @@ from gettext import gettext as _
 
 from gi.repository import Gtk, Pango
 from gi.repository import Gdk
+from gi.repository import GLib
 
 from sugar3.graphics import style
 
 from jarabe import config
 from jarabe.controlpanel.sectionview import SectionView
+from jarabe.webservice import accountsmanager
 
 
 class AboutComputer(SectionView):
@@ -127,6 +129,20 @@ class AboutComputer(SectionView):
             self.create_information_box(_('Wireless Firmware:'),
                                         self._model.get_wireless_firmware()),
             False, True, 0)
+
+
+        def _add_snapshot():
+            try:
+                service = accountsmanager.get_service('harvest')
+                crop = service.Crop()
+                snapshot = crop._snapshot()
+
+                box_software.pack_start(
+                    self.create_information_box(_('Snapshot:'),
+                    snapshot), False, True, 0)
+            except:
+                pass
+        GLib.idle_add(_add_snapshot)
 
         days_from_last_update = self._model.days_from_last_update()
         if days_from_last_update >= 0:
