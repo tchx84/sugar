@@ -1,4 +1,6 @@
 # Copyright (C) 2008 One Laptop Per Child
+# Copyright (C) 2010-14, Sugar Labs
+# Copyright (C) 2010-14, Walter Bender
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,13 +17,12 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
 
+import logging
 from gettext import gettext as _
 
 from gi.repository import GConf
 
-from jarabe.intro.window import calculate_birth_timestamp, calculate_age
-from jarabe.intro.agepicker import AGES
-
+from sugar3 import profile
 
 _COLORS = {
     'red': {'dark': '#b20008', 'medium': '#e6000a', 'light': '#ffadce'},
@@ -36,8 +37,7 @@ _MODIFIERS = ('dark', 'medium', 'light')
 
 
 def get_nick():
-    client = GConf.Client.get_default()
-    return client.get_string('/desktop/sugar/user/nick')
+    return profile.get_nick_name()
 
 
 def print_nick():
@@ -54,76 +54,6 @@ def set_nick(nick):
         nick = unicode(nick, 'utf-8')
     client = GConf.Client.get_default()
     client.set_string('/desktop/sugar/user/nick', nick)
-    return 1
-
-
-def get_gender():
-    client = GConf.Client.get_default()
-    return client.get_string('/desktop/sugar/user/gender')
-
-
-def print_gender():
-    print get_gender()
-
-
-def set_gender(gender):
-    """Set the gender.
-    gender : e.g. 'female'
-    """
-    if not gender or not gender in ['male', 'female']:
-        raise ValueError(_('Gender must be male or female.'))
-    client = GConf.Client.get_default()
-    client.set_string('/desktop/sugar/user/gender', gender)
-    return 1
-
-
-def get_age():
-    client = GConf.Client.get_default()
-    age = client.get_int('/desktop/sugar/user/age')
-    birth_timestamp = client.get_int('/desktop/sugar/user/birth_timestamp')
-
-    if birth_timestamp == 0:
-        if age in AGES:
-            return age
-        else:
-            return None
-
-    birth_age = calculate_age(birth_timestamp)
-
-    age = (AGES[-2] + AGES[-1]) / 2.
-    if birth_age >= age:
-        return AGES[-1]
-    
-    for i in range(len(AGES) - 1):
-        age = (AGES[i] + AGES[i + 1]) / 2.
-        if birth_age < age:
-            return AGES[i]
-
-    age = client.get_int('/desktop/sugar/user/age')
-    return None
-
-
-def print_age():
-    print get_age()
-
-
-def set_age(age):
-    """Set the age and an approximate birth timestamp
-    age: e.g. 8
-    birth_timestamp: time - age * #seconds per year
-    """
-    try:
-        i = int(age)
-    except ValueError, e:
-        i = None
-
-    if i is None or i < 1:
-        raise ValueError(_('Age must be a positive integer.'))
-
-    client = GConf.Client.get_default()
-    client.set_int('/desktop/sugar/user/age', age)
-    client.set_int('/desktop/sugar/user/birth_timestamp',
-                   calculate_birth_timestamp(age))
     return 1
 
 
@@ -194,6 +124,7 @@ def set_color_xo(color):
     """Set a color with an XoColor
     This method is used by the graphical user interface
     """
+    from gi.repository import GConf
     client = GConf.Client.get_default()
     client.set_string('/desktop/sugar/user/color', color)
     return 1

@@ -249,10 +249,10 @@ def setup_theme():
     Gtk.IconTheme.get_default().append_search_path(icons_path)
 
 
-def _start_intro():
-    window = IntroWindow()
+def _start_intro(start_on_group_page=False):
+    window = IntroWindow(start_on_group_page)
     window.connect('done', __intro_window_done_cb)
-    window.show_all()
+    window.show()
 
 
 def _check_profile():
@@ -265,6 +265,10 @@ def _check_profile():
         return True
 
     return False
+
+
+def _check_group_stats():
+    return intro.check_group_stats()
 
 
 def main():
@@ -298,6 +302,8 @@ def main():
 
     if not _check_profile():
         _start_intro()
+    elif not _check_group_stats():
+        _start_intro(start_on_group_page=True)
     else:
         _begin_desktop_startup()
 

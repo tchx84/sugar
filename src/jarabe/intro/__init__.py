@@ -1,5 +1,7 @@
 import os
 
+from gi.repository import GConf
+
 from sugar3 import env
 from sugar3.profile import get_profile
 
@@ -14,3 +16,8 @@ def check_profile():
         profile.convert_profile()
 
     return profile.is_valid()
+
+
+def check_group_stats():
+    client = GConf.Client.get_default()
+    return client.get_string('/desktop/sugar/user/group') is not None
