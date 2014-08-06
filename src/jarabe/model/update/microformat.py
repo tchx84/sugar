@@ -306,7 +306,7 @@ class MetadataLookup(GObject.GObject):
     and there is no local source of the activity's name.
     """
     __gsignals__ = {
-        'complete': (GObject.SignalFlags.RUN_FIRST, None, (object, int, str)),
+        'complete': (GObject.SignalFlags.RUN_FIRST, None, (object, object, object)),
     }
 
     def __init__(self, url):
@@ -404,6 +404,5 @@ class MetadataLookup(GObject.GObject):
         return cp.get('Library', parameter)
 
     def _complete(self, result):
-        logging.error('MetadataLookup._complete icon_data %s', self._icon_data)
         GLib.idle_add(self.emit, 'complete', result, self._size,
                       self._icon_data)
