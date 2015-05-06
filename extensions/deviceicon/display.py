@@ -31,7 +31,7 @@ from sugar3.graphics.palettemenu import PaletteMenuItemSeparator
 from sugar3.graphics.xocolor import XoColor
 
 from jarabe.frame.frameinvoker import FrameWidgetInvoker
-from jarabe.model.brightness import brightness
+from jarabe.model import brightness
 from jarabe.model.screenshot import take_screenshot
 from jarabe import frame
 
@@ -51,7 +51,8 @@ class DeviceView(TrayIcon):
         self.set_palette_invoker(FrameWidgetInvoker(self))
         self.palette_invoker.props.toggle_palette = True
 
-        brightness.brightness_changed.connect(self.__brightness_changed_cb)
+        self._model = brightness.get_instance()
+        self._model.changed_signal.connect(self.__brightness_changed_cb)
 
         self._update_output_info()
 
@@ -61,11 +62,11 @@ class DeviceView(TrayIcon):
         return palette
 
     def _update_output_info(self):
-        current_level = brightness.get_brightness()
+        current_level = self._model.get_brightness()
         xo_color = self._color
 
-        icon_number = math.ceil(float(brightness.get_brightness()) * 3
-                                / brightness.get_max_brightness()) * 33
+        icon_number = math.ceil(float(self._model.get_brightness()) * 3
+                                / self._model.get_max_brightness()) * 33
         if icon_number == 99:
             icon_number = 100
 
@@ -109,11 +110,14 @@ class BrightnessManagerWidget(Gtk.VBox):
         alignment.set_padding(0, 0, style.DEFAULT_SPACING,
                               style.DEFAULT_SPACING)
 
-        if brightness.can_set_brightness():
+        self._model = brightness.get_instance()
+
+        # if sugar-backlight-helper finds the device
+        if self._model.get_path():
             adjustment = Gtk.Adjustment(
-                value=brightness.get_brightness(),
+                value=self._model.get_brightness(),
                 lower=0,
-                upper=brightness.get_max_brightness() + 1,
+                upper=self._model.get_max_brightness() + 1,
                 step_incr=1,
                 page_incr=1,
                 page_size=1)
@@ -144,16 +148,16 @@ class BrightnessManagerWidget(Gtk.VBox):
     def update(self):
         if self._adjustment:
             self._adjustment.handler_block(self._adjustment_hid)
-            self._adjustment.props.value = brightness.get_brightness()
+            self._adjustment.props.value = self._model.get_brightness()
             self._adjustment.handler_unblock(self._adjustment_hid)
         else:
             self._progress_bar.props.fraction = \
-                float(brightness.get_brightness()) \
-                / brightness.get_max_brightness()
+                float(self._model.get_brightness()) \
+                / self._model.get_max_brightness()
 
     def __adjusted_cb(self, device, data=None):
         value = self._adjustment.props.value
-        brightness.set_brightness(int(value))
+        self._model.set_brightness(int(value))
 
 
 class DisplayPalette(Palette):
