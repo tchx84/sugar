@@ -62,20 +62,22 @@ class DeviceView(TrayIcon):
         palette.set_group_id('frame')
         return palette
 
-    def _update_output_info(self):
-        current_level = self._model.get_brightness()
+    def _update_output_info(self, value=None):
         xo_color = self._color
+        if value is None:
+            value  = self._model.get_brightness()
 
-        icon_number = math.ceil(float(self._model.get_brightness()) * 3
-                                / self._model.get_max_brightness()) * 33
+        icon_number = math.ceil(
+            float(value) * 3 / self._model.get_max_brightness()) * 33
+
         if icon_number == 99:
             icon_number = 100
 
         self.icon.props.icon_name = \
             'brightness-{:03d}'.format(int(icon_number))
 
-    def __brightness_changed_cb(self, **kwargs):
-        self._update_output_info()
+    def __brightness_changed_cb(self, model, value):
+        self._update_output_info(value)
 
 
 class BrightnessManagerWidget(Gtk.VBox):
