@@ -14,6 +14,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+import os
 import logging
 
 from gi.repository import GLib
@@ -40,6 +41,7 @@ class Brightness(GObject.GObject):
     def __init__(self):
         GObject.GObject.__init__(self)
         self._path = None
+        self._helper_path = None
         self._max_brightness = None
         self._monitor = None
         self._start_monitoring()
@@ -59,8 +61,13 @@ class Brightness(GObject.GObject):
             self.changed_signal.emit(self.get_brightness())
 
     def _get_helper(self):
-        # XXX determine installation path programmatically
-        return '/usr/libexec/sugar-backlight-helper'
+        if self._helper_path is None and 'PATH' in os.environ:
+            for path in os.environ['PATH'].split(os.pathsep):
+                helper_path = os.path.join(path, 'sugar-backlight-helper')
+                if os.path.exists(helper_path):
+                    self._helper_path = helper_path
+                    break
+        return self._helper_path
 
     def _helper_read(self, option):
         cmd = '%s --%s' % (self._get_helper(), option)
