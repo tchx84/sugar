@@ -35,6 +35,7 @@ def get_instance():
 class Brightness(GObject.GObject):
 
     MONITOR_RATE = 1000
+    TIMEOUT_DELAY = 1000
 
     changed_signal = GObject.Signal('changed', arg_types=([int]))
 
@@ -44,7 +45,9 @@ class Brightness(GObject.GObject):
         self._helper_path = None
         self._max_brightness = None
         self._monitor = None
+        self._save_timeout_id = None
         self._start_monitoring()
+        self._restore()
 
     def _start_monitoring(self):
         if not self.get_path():
@@ -82,6 +85,17 @@ class Brightness(GObject.GObject):
         result, output, error, status = GLib.spawn_command_line_sync(cmd)
         logging.debug(result)
 
+    def _save(self, value):
+        settings = Gio.Settings('org.sugarlabs.screen')
+        settings.set_int('brightness', value)
+
+    def _restore(self):
+        settings = Gio.Settings('org.sugarlabs.screen')
+        value = settings.get_int('brightness')
+        logging.debug('brightness restores: %s', str(value))
+        if value != -1:
+            self.set_brightness(value)
+
     def set_brightness(self, value):
         # ignore external changes for a while
         self._monitor.handler_block(self._monitor_changed_hid)
@@ -92,6 +106,18 @@ class Brightness(GObject.GObject):
         # listen to external changes after already checked
         GLib.timeout_add(self.MONITOR_RATE * 2,
             self._monitor.handler_unblock, self._monitor_changed_hid)
+
+        # wait until the last change to impact gsetting and avoid spam
+        if self._save_timeout_id is not None:
+            GLib.source_remove(self._save_timeout_id)
+        self._save_timeout_id = GLib.timeout_add(
+            self.TIMEOUT_DELAY, self.__save_brightness_cb, value)
+
+    def __save_brightness_cb(self, value):
+        logging.debug('brightness saves: %s', str(value))
+        self._save_timeout_id = None
+        self._save(value)
+        return False
 
     def get_path(self):
         if self._path is None:
