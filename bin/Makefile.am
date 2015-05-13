@@ -1,5 +1,6 @@
 python_scripts =		\
 	sugar-backlight-helper	\
+	sugar-backlight-setup	\
 	sugar-control-panel	\
 	sugar-install-bundle	\
 	sugar-launch

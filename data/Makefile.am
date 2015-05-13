@@ -67,7 +67,7 @@ convertdir = $(datarootdir)/GConf/gsettings
 convert_DATA = sugar-schemas.convert
 
 org.sugar.brightness.policy: org.sugar.brightness.policy.in
-	sed -e "s|\@bindir\@|$(bindir)|" $< > $@
+	sed -e "s|\@bindir\@|$(bindir)|g" $< > $@
 
 polkit_policydir = $(datadir)/polkit-1/actions
 polkit_in_files = org.sugar.brightness.policy.in

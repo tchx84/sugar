@@ -19,4 +19,15 @@
     <annotate key="org.freedesktop.policykit.exec.path">@bindir@/sugar-backlight-helper</annotate>
   </action>
 
+  <action id="org.sugar.backlight-setup">
+    <_description>Setup backlight device</_description>
+    <_message>Setup the backlight device symlink requires authentication</_message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">@bindir@/sugar-backlight-setup</annotate>
+  </action>
+
 </policyconfig>
