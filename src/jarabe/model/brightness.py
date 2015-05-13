@@ -35,6 +35,7 @@ class Brightness(GObject.GObject):
 
     MONITOR_RATE = 1000
     TIMEOUT_DELAY = 1000
+    SUGAR_LINK = '/var/run/sugar-backlight'
     changed_signal = GObject.Signal('changed', arg_types=([int]))
 
     def __init__(self):
@@ -46,8 +47,13 @@ class Brightness(GObject.GObject):
         self._monitor = None
         self._monitor_timeout_id = None
         self._monitor_changed_hid = None
+        self._setup()
         self._start_monitoring()
         self._restore()
+
+    def _setup(self):
+        cmd = 'pkexec %s' % self._find_binary('sugar-backlight-setup')
+        GLib.spawn_command_line_sync(cmd)
 
     def _save(self, value):
         settings = Gio.Settings('org.sugarlabs.screen')
@@ -70,13 +76,16 @@ class Brightness(GObject.GObject):
             self._monitor.connect('changed', self.__monitor_changed_cb)
 
     def _get_helper(self):
-        if self._helper_path is None and 'PATH' in os.environ:
-            for path in os.environ['PATH'].split(os.pathsep):
-                helper_path = os.path.join(path, 'sugar-backlight-helper')
-                if os.path.exists(helper_path):
-                    self._helper_path = helper_path
-                    break
+        if self._helper_path is None:
+            self._helper_path = self._find_binary('sugar-backlight-helper')
         return self._helper_path
+
+    def _find_binary(self, binary):
+        for path in os.environ['PATH'].split(os.pathsep):
+            binary_path = os.path.join(path, binary)
+            if os.path.exists(binary_path):
+                return binary_path
+        return None
 
     def _helper_read(self, option):
         cmd = '%s --%s' % (self._get_helper(), option)
@@ -125,7 +134,8 @@ class Brightness(GObject.GObject):
 
     def get_path(self):
         if self._path is None:
-            self._path = self._helper_read('get-path')
+            if os.path.exists(self.SUGAR_LINK):
+                self._path = self.SUGAR_LINK
         return self._path
 
     def get_brightness(self):
