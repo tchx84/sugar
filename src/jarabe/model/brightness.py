@@ -87,7 +87,7 @@ class Brightness(GObject.GObject):
 
     def _helper_write(self, option, value):
         cmd = 'pkexec %s --%s %d' % (self._get_helper(), option, value)
-        result, output, error, status = GLib.spawn_command_line_sync(cmd)
+        GLib.spawn_command_line_sync(cmd)
 
     def __monitor_changed_cb(self, monitor, child, other_file, event):
         if event == Gio.FileMonitorEvent.CHANGED:
