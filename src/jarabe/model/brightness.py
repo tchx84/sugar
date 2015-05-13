@@ -33,6 +33,7 @@ def get_instance():
 
 class Brightness(GObject.GObject):
 
+    STEPS = 20
     MONITOR_RATE = 1000
     TIMEOUT_DELAY = 1000
     SUGAR_LINK = '/var/run/sugar-backlight'
@@ -145,3 +146,9 @@ class Brightness(GObject.GObject):
         if self._max_brightness is None:
             self._max_brightness = int(self._helper_read('get-max-brightness'))
         return self._max_brightness
+
+    def get_step_amount(self):
+        if self.get_max_brightness() < self.STEPS:
+            return 1
+        else:
+            return self.get_max_brightness() / self.STEPS
