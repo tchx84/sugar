@@ -125,9 +125,9 @@ class BrightnessManagerWidget(Gtk.VBox):
                 value=self._model.get_brightness(),
                 lower=0,
                 upper=self._model.get_max_brightness() + 1,
-                step_incr=1,
-                page_incr=1,
-                page_size=1)
+                step_incr=self._model.get_step_amount(),
+                page_incr=self._model.get_step_amount(),
+                page_size=self._model.get_step_amount())
             self._adjustment = adjustment
 
             self._adjustment_timeout_id = None
