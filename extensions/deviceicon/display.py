@@ -219,7 +219,7 @@ class DisplayPalette(Palette):
         self._box.append_item(separator, 0, 0)
 
     def __popup_cb(self, palette):
-        if self._brightness_mananger is not None:
+        if self._brightness_manager is not None:
             self._brightness_manager.update()
 
     def __screenshot_cb(self, palette):
