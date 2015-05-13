@@ -26,15 +26,12 @@ def handle_key_press(key):
         return
 
     value = model.get_brightness()
-    max_value = model.get_max_brightness()
-    delta = max_value / STEPS
-
     if key == 'XF86MonBrightnessUp':
-        new_value = value + delta
-        if new_value > max_value:
-            new_value = max_value
+        new_value = value + model.get_step_amount()
+        if new_value > model.get_max_brightness():
+            new_value = model.get_max_brightness()
     else:
-        new_value = value - delta
+        new_value = value - model.get_step_amount()
         if new_value < 0:
             new_value = 0
 
