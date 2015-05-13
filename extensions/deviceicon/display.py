@@ -82,7 +82,7 @@ class DeviceView(TrayIcon):
 
 class BrightnessManagerWidget(Gtk.VBox):
 
-    TIMEOUT_DELAY = 200
+    TIMEOUT_DELAY = 100
 
     def __init__(self, text, icon_name):
         Gtk.VBox.__init__(self)
