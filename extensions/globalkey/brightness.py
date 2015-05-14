@@ -16,7 +16,6 @@
 
 from jarabe.model import brightness
 
-STEPS = 8
 BOUND_KEYS = ['XF86MonBrightnessUp', 'XF86MonBrightnessDown']
 
 
