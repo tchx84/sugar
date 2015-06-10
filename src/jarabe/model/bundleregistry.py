@@ -189,12 +189,31 @@ class BundleRegistry(GObject.GObject):
                 self._favorite_bundles[i] = favorite_bundles
 
     def _scan_new_favorites(self):
+        hidden_activities = []
+
+        path = os.environ.get('SUGAR_ACTIVITIES_HIDDEN', None)
+        try:
+            with open(path) as hidden_file:
+                for line in hidden_file.readlines():
+                    bundle_id = line.strip()
+                    if bundle_id:
+                        hidden_activities.append(bundle_id)
+        except:
+            logging.error('Could not load hidden activities from %s', path)
+
         for bundle in self:
+            bundle_id = bundle.get_bundle_id()
             key = self._get_favorite_key(
-                bundle.get_bundle_id(), bundle.get_activity_version())
-            # If the entry exists we simply ignore it, otherwise create one.
-            if not self._favorite_bundles[_DEFAULT_VIEW].get(key, None):
-               self._favorite_bundles[_DEFAULT_VIEW][key] = {'favorite': True}
+                bundle_id, bundle.get_activity_version())
+            if key not in self._favorite_bundles[_DEFAULT_VIEW] and \
+                    bundle_id in hidden_activities:
+                self._favorite_bundles[_DEFAULT_VIEW][key] = \
+                    {'favorite': False}
+            elif not self._favorite_bundles[_DEFAULT_VIEW].get(key, None):
+                self._favorite_bundles[_DEFAULT_VIEW][key] = \
+                    {'favorite': True}
+            elif 'favorite' not in self._favorite_bundles[_DEFAULT_VIEW][key]:
+                self._favorite_bundles[_DEFAULT_VIEW][key]['favorite'] = True
         self._write_favorites_file(_DEFAULT_VIEW)
 
     def get_bundle(self, bundle_id):
