@@ -101,11 +101,9 @@ class BundleRegistry(GObject.GObject):
             monitor.connect('changed', self.__file_monitor_changed_cb)
             self._gio_monitors.append(monitor)
 
-        self._last_defaults_mtime = []
         self._favorite_bundles = []
         for i in range(desktop.get_number_of_views()):
             self._favorite_bundles.append({})
-            self._last_defaults_mtime.append(-1)
 
         settings = Gio.Settings('org.sugarlabs')
         self._protected_activities = settings.get_strv('protected-activities')
@@ -123,9 +121,6 @@ class BundleRegistry(GObject.GObject):
 
     def __desktop_view_icons_changed_cb(self, model):
         number_of_views = desktop.get_number_of_views()
-        if len(self._last_defaults_mtime) < number_of_views:
-            for i in range(number_of_views - len(self._last_defaults_mtime)):
-                self._last_defaults_mtime.append(-1)
         if len(self._favorite_bundles) < number_of_views:
             for i in range(number_of_views - len(self._favorite_bundles)):
                 self._favorite_bundles.append({})
@@ -191,8 +186,6 @@ class BundleRegistry(GObject.GObject):
                         raise ValueError('Invalid format in %s.' %
                                          favorites_path)
 
-                self._last_defaults_mtime[i] = \
-                    float(favorites_data['defaults-mtime'])
                 self._favorite_bundles[i] = favorite_bundles
 
     def _scan_new_favorites(self):
@@ -401,7 +394,6 @@ class BundleRegistry(GObject.GObject):
             path = env.get_profile_path('favorite_activities_%d' %
                                         (favorite_view))
         favorites_data = {
-            'defaults-mtime': self._last_defaults_mtime[favorite_view],
             'favorites': self._favorite_bundles[favorite_view]}
         json.dump(favorites_data, open(path, 'w'), indent=1)
 
