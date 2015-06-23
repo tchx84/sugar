@@ -206,6 +206,7 @@ class _Account(GObject.GObject):
             model = shell.get_model()
             model.disconnect(self._home_changed_hid)
             self._home_changed_hid = None
+        self.emit('disconnected')
 
     def _start_listening(self):
         bus = dbus.Bus()
@@ -730,6 +731,16 @@ class Neighborhood(GObject.GObject):
                             dbus_interface=PROPERTIES_IFACE,
                             reply_handler=self.__got_accounts_cb,
                             error_handler=self.__error_handler_cb)
+
+        self._monitor = Gio.NetworkMonitor.get_default()
+        self._monitor.connect('network-changed', self.__network_changed_cb)
+
+    def __network_changed_cb(self, monitor, available, data=None):
+        logging.debug('network-changed %r', available)
+        if available:
+            self._server_account.enable()
+        else:
+            self._server_account.disable()
 
     def __got_accounts_cb(self, account_paths):
         self._link_local_account = \
