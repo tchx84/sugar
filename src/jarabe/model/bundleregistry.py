@@ -71,6 +71,8 @@ class BundleRegistry(GObject.GObject):
                            ([GObject.TYPE_PYOBJECT])),
     }
 
+    _MAX_DELAY = 10000
+
     def __init__(self):
         logging.debug('STARTUP: Loading the bundle registry')
         GObject.GObject.__init__(self)
@@ -137,9 +139,24 @@ class BundleRegistry(GObject.GObject):
     def __file_monitor_changed_cb(self, monitor, one_file, other_file,
                                   event_type):
         if event_type == Gio.FileMonitorEvent.CREATED:
-            self.add_bundle(one_file.get_path(), set_favorite=True)
+            bundle_path = one_file.get_path()
+            # XXX ignore debian packages temporary directories
+            if bundle_path.endswith('.dpkg-new'):
+                return
+            # XXX SL4841 we can't guarantee the contents are all set yet
+            delay = 100
+            GLib.timeout_add(delay, self.__timeout_add_cb, bundle_path, delay)
         elif event_type == Gio.FileMonitorEvent.DELETED:
             self.remove_bundle(one_file.get_path())
+
+    def __timeout_add_cb(self, bundle_path, delay):
+        bundle = self.add_bundle(bundle_path, set_favorite=True)
+        if not bundle and delay < self._MAX_DELAY:
+            delay *= 10
+            GLib.timeout_add(delay, self.__timeout_add_cb, bundle_path, delay)
+        else:
+            logging.debug('stopping for %s after %d ms', bundle_path, delay)
+        return False
 
     def _load_mime_defaults(self):
         defaults = {}
