@@ -137,9 +137,14 @@ class BundleRegistry(GObject.GObject):
     def __file_monitor_changed_cb(self, monitor, one_file, other_file,
                                   event_type):
         if event_type == Gio.FileMonitorEvent.CREATED:
-            self.add_bundle(one_file.get_path(), set_favorite=True)
+            # XXX SL4841 we can't guarantee the contents are all set yet
+            GLib.timeout_add(5000, self.__timeout_add_cb, one_file.get_path())
         elif event_type == Gio.FileMonitorEvent.DELETED:
             self.remove_bundle(one_file.get_path())
+
+    def __timeout_add_cb(self, bundle_path):
+        self.add_bundle(bundle_path, set_favorite=True)
+        return False
 
     def _load_mime_defaults(self):
         defaults = {}
